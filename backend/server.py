@@ -39,16 +39,21 @@ def process_excel_file(file_path):
 
         # Формирование необходимых данных
         data = {
-            "Наименование продукции": df.iloc[:, 1],  # Столбец B
-            "Сдача на склад сбыта - всего": df.iloc[:, 21],  # Столбец V
-            "Сдача на склад сбыта - Маркс": df.iloc[:, 22],  # Столбец W
-            "Сдача на склад сбыта - ОП Москва": df.iloc[:, 23],  # Столбец X
-            "Фактический % выполнения плана - всего": df.iloc[:, 24],  # Столбец Y
-            "Фактический % выполнения плана - Маркс": df.iloc[:, 25],  # Столбец Z
-            "Фактический % выполнения плана - ОП Москва": df.iloc[:, 26],  # Столбец AA
+            "Наименование продукции": df.iloc[:, 1].fillna(""),  # Столбец B
+            "Сдача на склад сбыта - всего": df.iloc[:, 21].fillna(0),  # Столбец V
+            "Сдача на склад сбыта - Маркс": df.iloc[:, 22].fillna(0),  # Столбец W
+            "Сдача на склад сбыта - ОП Москва": df.iloc[:, 23].fillna(0),  # Столбец X
+            "Фактический % выполнения плана - всего": df.iloc[:, 24].fillna(0),  # Столбец Y
+            "Фактический % выполнения плана - Маркс": df.iloc[:, 25].fillna(0),  # Столбец Z
+            "Фактический % выполнения плана - ОП Москва": df.iloc[:, 26].fillna(0),  # Столбец AA
         }
 
-        processed_data = pd.DataFrame(data).dropna()
+        # Создание DataFrame с обработанными значениями
+        processed_data = pd.DataFrame(data)
+
+        # Удаляем строки с некорректными значениями и заменяем их на 0
+        processed_data = processed_data.replace([float("inf"), float("-inf")], 0)
+
         logger.info("Файл успешно обработан.")
         return processed_data
 
@@ -70,10 +75,16 @@ async def upload_file(file: UploadFile = File(...)):
 
         # Обработка файла
         result = process_excel_file(temp_file.name)
+
+        # Удаление временного файла
         os.remove(temp_file.name)
 
         # Возвращаем результат
-        return {"message": "Файл успешно обработан", "data": result.to_dict(orient="records")}
+        return JSONResponse(
+            content={"message": "Файл успешно обработан", "data": result.to_dict(orient="records")},
+            status_code=200,
+        )
+
     except ValueError as e:
         return JSONResponse(status_code=400, content={"message": str(e)})
     except Exception as e:
