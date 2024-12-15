@@ -1,10 +1,11 @@
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-import openpyxl
+from pydantic import BaseModel
+import pandas as pd
+import os
+import tempfile
 import logging
-from typing import List
-from datetime import datetime
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -15,50 +16,46 @@ app = FastAPI()
 # Настройка CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Разрешаем запросы со всех источников (для разработки)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-def serialize_cell_value(value):
-    """
-    Преобразует значения, которые не сериализуются в JSON.
-    """
-    if value is None:
-        return None  # Оставляем None для фильтрации
-    if isinstance(value, datetime):
-        return value.strftime("%Y-%m-%d %H:%M:%S")
-    return value
+# Модель данных для входа
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
-def calculate_performance(data: List[List]):
+# Обработка данных из Excel
+def process_sales_report(file_path):
     """
-    Рассчитывает выполнение плана и возвращает сводные данные.
-    Пропускает строки с пустыми критическими значениями.
+    Обрабатывает данные из файла "Сводка по сбыту" с указанием конкретных столбцов.
     """
-    summary = []
-    for row in data:
-        try:
-            # Пропускаем строку, если "План" или "Факт" пустые
-            if row[1] is None or row[2] is None:
-                continue
+    try:
+        # Загружаем данные начиная с 11 строки (skiprows=10)
+        df = pd.read_excel(file_path, skiprows=10, usecols="B,M,Y,Z,AA,AB,AD")
 
-            nomenclature = row[0] or "Не указано"
-            plan = float(row[1])
-            fact = float(row[2])
-            performance = (fact / plan) * 100 if plan > 0 else 0
+        # Переименование нужных столбцов
+        df.rename(columns={
+            "B": "Наименование продукции",
+            "M": "План отгрузки",
+            "Y": "Фактический % выполнения плана - всего",
+            "Z": "Фактический % выполнения плана - Маркс",
+            "AA": "Фактический % выполнения плана - ОП Москва",
+            "AB": "Отгружено счетчиков",
+            "AD": "Процент выполнения плана"
+        }, inplace=True)
 
-            summary.append({
-                "Номенклатура": nomenclature,
-                "План": plan,
-                "Факт": fact,
-                "Выполнение (%)": round(performance, 2),
-                "Статус": "Выполнено" if performance >= 90 else "Не выполнено"
-            })
-        except Exception as e:
-            logger.error(f"Ошибка при расчёте строки {row}: {e}")
-    return summary
+        # Убираем строки, где отсутствуют значения в ключевых столбцах
+        df = df.dropna(subset=["Наименование продукции", "План отгрузки"])
 
+        return df
+    except Exception as e:
+        logger.error(f"Ошибка при обработке файла: {str(e)}")
+        raise ValueError(f"Ошибка обработки файла: {str(e)}")
+
+# Эндпоинт для загрузки файлов
 @app.post("/upload/")
 async def upload_files(
     file1: UploadFile = File(...),
@@ -66,46 +63,75 @@ async def upload_files(
     file3: UploadFile = File(...),
 ):
     """
-    Обработка загрузки трёх файлов, выполнение расчётов и возврат сводных данных.
+    Обрабатывает три файла и возвращает их содержимое.
     """
     try:
-        logger.info("Началась обработка файлов...")
+        file_paths = []
 
-        extracted_data = []
+        # Сохраняем файлы временно с использованием tempfile
+        for idx, file in enumerate([file1, file2, file3], start=1):
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+            with open(temp_file.name, "wb") as f:
+                f.write(await file.read())
+            file_paths.append(temp_file.name)
 
-        for file in [file1, file2, file3]:
-            logger.info(f"Обрабатывается файл: {file.filename}")
+        # Обрабатываем данные
+        sales_data = process_sales_report(file_paths[0])
 
-            content = await file.read()
-            temp_file_path = f"temp_{file.filename}"
+        # Очистка временных файлов
+        for path in file_paths:
+            if os.path.exists(path):
+                os.remove(path)
 
-            with open(temp_file_path, "wb") as temp_file:
-                temp_file.write(content)
-            logger.info(f"Файл временно сохранен: {temp_file_path}")
-
-            workbook = openpyxl.load_workbook(temp_file_path)
-            sheet = workbook.active
-
-            # Извлекаем данные
-            header = [serialize_cell_value(cell) for cell in sheet[1]]
-            rows = [
-                [serialize_cell_value(cell) for cell in row]
-                for row in sheet.iter_rows(min_row=2, values_only=True)
-            ]
-
-            if "План" in header and "Факт" in header:
-                logger.info(f"Рассчитываются данные выполнения для файла: {file.filename}")
-                summary = calculate_performance(rows)
-                extracted_data.append({"file": file.filename, "summary": summary})
-            else:
-                extracted_data.append({"file": file.filename, "data": rows})
-
-        logger.info("Все файлы успешно обработаны")
-
-        return JSONResponse(content={"message": "Файлы обработаны!", "data": extracted_data})
-
-    except Exception as e:
-        logger.error(f"Общая ошибка при обработке файлов: {e}")
+        # Возвращаем результат
         return JSONResponse(
-            status_code=500, content={"message": f"Произошла ошибка: {str(e)}"}
+            content={
+                "message": "Файлы успешно загружены и обработаны",
+                "data": {
+                    "sales": sales_data.to_dict(orient="records"),
+                },
+            }
         )
+    except ValueError as e:
+        logger.error(f"Ошибка обработки файлов: {str(e)}")
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Ошибка при обработке файлов: {str(e)}"}
+        )
+    except Exception as e:
+        logger.error(f"Непредвиденная ошибка: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"message": f"Ошибка при обработке файлов: {str(e)}"}
+        )
+
+# Эндпоинт для авторизации пользователя
+@app.post("/api/login")
+async def login(request: LoginRequest):
+    """
+    Эндпоинт для авторизации пользователя.
+    Проверяет имя пользователя и пароль.
+    """
+    # Пример проверки логина и пароля (замените на свою логику)
+    if request.username == "admin" and request.password == "password":
+        return {"access_token": "example_token_123", "token_type": "bearer"}
+    else:
+        raise HTTPException(status_code=401, detail="Неверное имя пользователя или пароль.")
+
+# Очистка временных файлов при завершении работы приложения
+@app.on_event("shutdown")
+def cleanup_temp_files():
+    """
+    Удаляет временные файлы при завершении работы приложения.
+    """
+    for file in os.listdir(tempfile.gettempdir()):
+        if file.startswith("temp_") and file.endswith(".xlsx"):
+            try:
+                os.remove(os.path.join(tempfile.gettempdir(), file))
+            except OSError as e:
+                logger.error(f"Ошибка при удалении временного файла: {file}, {str(e)}")
+
+# Эндпоинт для проверки работоспособности сервера
+@app.get("/")
+def read_root():
+    return {"message": "Сервер работает!"}
