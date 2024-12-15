@@ -2,63 +2,32 @@ import React, { useState, useContext, useRef } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 
 function UploadPage() {
-  const [files, setFiles] = useState({ file1: null, file2: null, file3: null });
+  const [file, setFile] = useState(null);
   const [status, setStatus] = useState("");
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const { authToken, logout } = useContext(AuthContext);
-
-  const fileInputRefs = {
-    file1: useRef(null),
-    file2: useRef(null),
-    file3: useRef(null),
-  };
-
-  const allowedTypes = [
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/vnd.ms-excel",
-    "text/csv",
-  ];
-  const maxSize = 10 * 1024 * 1024; // 10 МБ
+  const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
-    const { name, files: uploadedFiles } = e.target;
-    const file = uploadedFiles[0];
-
-    if (file) {
-      if (!allowedTypes.includes(file.type)) {
-        alert("Пожалуйста, выберите файл Excel или CSV формата.");
-        e.target.value = "";
-        return;
-      }
-
-      if (file.size > maxSize) {
-        alert("Файл слишком большой. Максимальный размер 10 МБ.");
-        e.target.value = "";
-        return;
-      }
-
-      setFiles({ ...files, [name]: file }); // Заменено на правильный синтаксис
-    }
+    setFile(e.target.files[0]);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!files.file1 || !files.file2 || !files.file3) {
-      alert("Пожалуйста, загрузите все три файла");
+    if (!file) {
+      alert("Пожалуйста, выберите файл для загрузки.");
       return;
     }
 
-    setStatus("Загрузка файлов на сервер...");
-    setError(null);
+    setStatus("Загрузка файла на сервер...");
     setIsLoading(true);
+    setError(null);
 
     const formData = new FormData();
-    formData.append("file1", files.file1);
-    formData.append("file2", files.file2);
-    formData.append("file3", files.file3);
+    formData.append("file", file); // Ключ "file" совпадает с серверным параметром
 
     try {
       const response = await fetch("http://127.0.0.1:8000/upload/", {
@@ -70,147 +39,54 @@ function UploadPage() {
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          // Токен недействителен или истек
-          logout();
-        }
+        if (response.status === 401) logout();
         const errorData = await response.json();
-        throw new Error(errorData.detail || "Ошибка на сервере");
+        throw new Error(errorData.message || "Ошибка на сервере.");
       }
 
-      const responseData = await response.json();
-      setData(responseData.data);
-      setStatus("Файлы успешно загружены и обработаны.");
-
-      // Очистка полей ввода файлов
-      setFiles({ file1: null, file2: null, file3: null });
-      Object.values(fileInputRefs).forEach((ref) => {
-        if (ref.current) ref.current.value = "";
-      });
-    } catch (error) {
-      console.error("Ошибка:", error);
-      setError(error.message || "Произошла ошибка при загрузке файлов.");
-      setStatus("");
+      const result = await response.json();
+      setData(result.data);
+      setStatus("Файл успешно загружен и обработан.");
+    } catch (err) {
+      console.error(err);
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const isDisabled = !files.file1 || !files.file2 || !files.file3 || isLoading;
-
-  // Компонент для отображения таблицы данных
-  const DataTable = ({ title, tableData }) => {
-    if (!tableData || tableData.length === 0) {
-      return <p className="mt-4 text-gray-700">Нет данных для отображения.</p>;
-    }
-
-    return (
-      <div className="w-full max-w-5xl mt-6 overflow-x-auto">
-        <h2 className="text-lg font-bold mb-4">{title}</h2>
-        <table className="w-full table-auto border-collapse border border-gray-300">
-          <thead>
-            <tr>
-              {Object.keys(tableData[0]).map((col) => (
-                <th
-                  key={col}
-                  className="border border-gray-300 p-2 bg-gray-100"
-                  style={{ position: "sticky", top: 0 }}
-                >
-                  {col}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {tableData.map((row, index) => (
-              <tr
-                key={index}
-                className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
-              >
-                {Object.values(row).map((value, colIndex) => (
-                  <td key={colIndex} className="border border-gray-300 p-2">
-                    {typeof value === "number"
-                      ? value.toLocaleString("ru-RU")
-                      : value || "-"}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  };
-
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <h1 className="text-2xl font-bold mb-6">Загрузка файлов</h1>
+      <h1 className="text-2xl font-bold mb-6">Загрузка файла</h1>
       <form
-        className="w-full max-w-lg bg-white p-6 rounded shadow-md"
         onSubmit={handleSubmit}
+        className="w-full max-w-lg bg-white p-6 rounded shadow-md"
       >
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-800">
-            Таблица 1: Сводка по сбыту
-          </label>
-          <input
-            ref={fileInputRefs.file1}
-            type="file"
-            name="file1"
-            onChange={handleFileChange}
-            className="w-full p-2 border border-gray-300 rounded mt-2"
-          />
-        </div>
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-800">
-            Таблица 2: Отчет по ремонту
-          </label>
-          <input
-            ref={fileInputRefs.file2}
-            type="file"
-            name="file2"
-            onChange={handleFileChange}
-            className="w-full p-2 border border-gray-300 rounded mt-2"
-          />
-        </div>
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-800">
-            Таблица 3: Отчет по проблемам
-          </label>
-          <input
-            ref={fileInputRefs.file3}
-            type="file"
-            name="file3"
-            onChange={handleFileChange}
-            className="w-full p-2 border border-gray-300 rounded mt-2"
-          />
-        </div>
+        <input
+          type="file"
+          onChange={handleFileChange}
+          ref={fileInputRef}
+          className="w-full p-2 border rounded mb-4"
+        />
         <button
           type="submit"
-          className={`w-full bg-green-500 text-white p-2 rounded hover:bg-green-600 transition ${
-            isDisabled ? "cursor-not-allowed opacity-50" : ""
+          className={`w-full bg-green-500 text-white p-2 rounded ${
+            isLoading ? "opacity-50 cursor-not-allowed" : ""
           }`}
-          disabled={isDisabled}
+          disabled={isLoading}
         >
-          {isLoading ? "Отправка..." : "Отправить файлы"}
+          {isLoading ? "Загрузка..." : "Отправить"}
         </button>
         {status && <p className="mt-4 text-gray-700">{status}</p>}
         {error && <p className="mt-4 text-red-500">{error}</p>}
       </form>
-
-      {/* Отображение данных, полученных от сервера */}
       {data && (
-        <>
-          {data.sales && (
-            <DataTable title="Сводка по сбыту" tableData={data.sales} />
-          )}
-          {data.repairs && (
-            <DataTable title="Отчет по ремонту" tableData={data.repairs} />
-          )}
-          {data.issues && (
-            <DataTable title="Отчет по проблемам" tableData={data.issues} />
-          )}
-        </>
+        <div className="mt-8 w-full max-w-4xl">
+          <h2 className="text-xl font-bold mb-4">Результаты обработки</h2>
+          <pre className="bg-gray-200 p-4 rounded overflow-x-auto">
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        </div>
       )}
     </div>
   );
