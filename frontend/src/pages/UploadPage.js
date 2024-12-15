@@ -1,7 +1,7 @@
 import React, { useState, useContext, useRef } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import Select from "react-select";
-import { Doughnut, Line } from "react-chartjs-2";
+import { Bar, Doughnut } from "react-chartjs-2";
 import "chart.js/auto";
 
 function UploadPage() {
@@ -11,6 +11,9 @@ function UploadPage() {
   const [selectedType, setSelectedType] = useState(null);
   const [selectedMetric, setSelectedMetric] = useState(
     "Сдача на склад сбыта - всего"
+  );
+  const [selectedSummaryMetric, setSelectedSummaryMetric] = useState(
+    "Сдача на склад сбыта - Маркс"
   );
   const [status, setStatus] = useState("");
   const [error, setError] = useState(null);
@@ -69,40 +72,79 @@ function UploadPage() {
     ? allData.filter(
         (item) => item["Наименование продукции"] === selectedType.value
       )
-    : allData;
+    : [];
 
   const doughnutData = {
-    labels: filteredData.map((item) => item["Наименование продукции"]),
+    labels: ["Процент выполнения плана", "Оставшаяся часть"],
     datasets: [
       {
-        label: "Процент выполнения плана",
-        data: filteredData.map(
-          (item) =>
-            item[
-              `Фактический % выполнения плана - ${
-                selectedMetric.split(" - ")[1]
-              }`
-            ] || 0
-        ),
-        backgroundColor: [
-          "rgba(75, 192, 192, 0.6)",
-          "rgba(153, 102, 255, 0.6)",
-          "rgba(255, 159, 64, 0.6)",
-          "rgba(255, 99, 132, 0.6)",
+        data: [
+          filteredData.length > 0
+            ? filteredData[0][
+                `Фактический % выполнения плана - ${
+                  selectedMetric.split(" - ")[1]
+                }`
+              ] || 0
+            : 0,
+          100 -
+            (filteredData.length > 0
+              ? filteredData[0][
+                  `Фактический % выполнения плана - ${
+                    selectedMetric.split(" - ")[1]
+                  }`
+                ] || 0
+              : 0),
         ],
+        backgroundColor: (context) => {
+          const percentage =
+            filteredData.length > 0
+              ? filteredData[0][
+                  `Фактический % выполнения плана - ${
+                    selectedMetric.split(" - ")[1]
+                  }`
+                ] || 0
+              : 0;
+
+          const gradient = context.chart.ctx.createLinearGradient(
+            0,
+            0,
+            200,
+            200
+          );
+          gradient.addColorStop(0, "red");
+          gradient.addColorStop(0.5, "yellow");
+          gradient.addColorStop(1, "green");
+
+          return [gradient, "rgba(200, 200, 200, 0.2)"];
+        },
         hoverOffset: 4,
       },
     ],
   };
 
-  const lineData = {
+  const barData = {
     labels: summary.map((item) => item["Наименование продукции"]),
     datasets: [
       {
-        label: selectedMetric,
-        data: summary.map((item) => item[selectedMetric] || 0),
-        borderColor: "rgba(75, 192, 192, 1)",
-        fill: false,
+        label: selectedSummaryMetric,
+        data: summary.map((item) => {
+          const value = item[selectedSummaryMetric] || 0;
+
+          // Увеличиваем видимость "Итого (сетевое оборудование)"
+          if (
+            item["Наименование продукции"] === "Итого (сетевое оборудование)"
+          ) {
+            return value * 10; // Увеличение значения
+          }
+          return value;
+        }),
+        backgroundColor: (context) => {
+          const gradient = context.chart.ctx.createLinearGradient(0, 0, 0, 300);
+          gradient.addColorStop(0, "red");
+          gradient.addColorStop(0.5, "yellow");
+          gradient.addColorStop(1, "green");
+          return gradient;
+        },
       },
     ],
   };
@@ -145,26 +187,26 @@ function UploadPage() {
             />
           </div>
 
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-2xl font-bold mb-4">
-              Круговая диаграмма по показателям
-            </h2>
-            {filteredData.length > 0 ? (
+          {selectedType && (
+            <div className="bg-white p-4 rounded shadow">
+              <h2 className="text-2xl font-bold mb-4">
+                Круговая диаграмма по показателям
+              </h2>
               <Doughnut data={doughnutData} />
-            ) : (
-              <p className="text-gray-700">Нет данных для отображения.</p>
-            )}
-          </div>
+            </div>
+          )}
 
           <div className="bg-white p-4 rounded shadow mt-6">
             <h2 className="text-2xl font-bold mb-4">Итоговые показатели</h2>
-            {summary.length > 0 ? (
-              <Line data={lineData} />
-            ) : (
-              <p className="text-gray-700">
-                Нет итоговых данных для отображения.
-              </p>
-            )}
+            <Select
+              options={metricOptions}
+              onChange={(option) =>
+                setSelectedSummaryMetric(option?.value || "")
+              }
+              placeholder="Выберите фильтр..."
+              defaultValue={metricOptions[1]}
+            />
+            <Bar data={barData} />
           </div>
         </div>
       )}
