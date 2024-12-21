@@ -1,4 +1,5 @@
-import React, { useState, useContext, useRef } from "react";
+import React, { useState, useContext, useRef, useEffect } from "react";
+import axios from "axios";
 import { AuthContext } from "../contexts/AuthContext";
 import Select from "react-select";
 import { Bar, Doughnut } from "react-chartjs-2";
@@ -6,145 +7,156 @@ import "chart.js/auto";
 
 function UploadPage() {
   const [file, setFile] = useState(null);
-  const [allData, setAllData] = useState([]);
   const [summary, setSummary] = useState([]);
-  const [selectedType, setSelectedType] = useState(null);
-  const [selectedMetric, setSelectedMetric] = useState(
-    "Сдача на склад сбыта - всего"
-  );
-  const [selectedSummaryMetric, setSelectedSummaryMetric] = useState(
-    "Сдача на склад сбыта - Маркс"
-  );
-  const [status, setStatus] = useState("");
+  const [filteredSummary, setFilteredSummary] = useState([]);
+  const [selectedFactory, setSelectedFactory] = useState({
+    value: "всего",
+    label: "Всего",
+  });
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const { authToken, logout } = useContext(AuthContext);
+
+  const { authToken } = useContext(AuthContext);
   const fileInputRef = useRef(null);
 
-  const fetchData = async () => {
-    if (!file) return;
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+  };
 
-    setStatus("Загрузка...");
+  const handleUpload = async () => {
+    if (!file) {
+      setError("Пожалуйста, выберите файл.");
+      return;
+    }
+
+    setIsLoading(true);
     setError(null);
 
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/upload/", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${authToken}` },
-        body: formData,
-      });
+      const response = await axios.post(
+        "http://127.0.0.1:8000/upload/",
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
 
-      if (!response.ok) throw new Error("Ошибка загрузки файла");
-      const result = await response.json();
+      const rawSummary = response.data.summary;
 
-      setAllData(result.all_data);
-      setSummary(result.summary);
-      setStatus("Файл успешно загружен и обработан");
+      // Проверяем, существует ли уже строка "ВСЕГО"
+      const hasTotal = rawSummary.some(
+        (row) => row["Наименование продукции"] === "ВСЕГО"
+      );
+
+      if (!hasTotal) {
+        const lastRow = rawSummary[rawSummary.length - 1];
+        if (lastRow) {
+          lastRow["Наименование продукции"] = "ВСЕГО";
+          rawSummary.push(lastRow);
+        }
+      }
+
+      // Фильтруем итоговые строки
+      const filteredData = rawSummary.filter(
+        (row) =>
+          row["Наименование продукции"] === "Итого (однофазные)" ||
+          row["Наименование продукции"] === "Итого (трехфазные)" ||
+          row["Наименование продукции"] === "Итого (перепрошивка)" ||
+          row["Наименование продукции"] === "ВСЕГО"
+      );
+
+      setSummary(filteredData);
+      setFilteredSummary(filteredData);
+      setIsLoading(false);
     } catch (err) {
-      setError(err.message || "Ошибка при загрузке");
+      setError("Ошибка загрузки файла. Проверьте структуру файла.");
+      setIsLoading(false);
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    fetchData();
-  };
-
-  const handleFileChange = (e) => setFile(e.target.files[0]);
-
-  const filterOptions = allData.map((item) => ({
-    value: item["Наименование продукции"],
-    label: item["Наименование продукции"],
-  }));
-
-  const metricOptions = [
-    { value: "Сдача на склад сбыта - всего", label: "Всего" },
-    { value: "Сдача на склад сбыта - Маркс", label: "Счетчики (Маркс)" },
-    {
-      value: "Сдача на склад сбыта - ОП Москва",
-      label: "Счетчики (ОП Москва)",
-    },
+  const factoryOptions = [
+    { value: "всего", label: "Всего" },
+    { value: "Маркс", label: "Счетчики (Маркс)" },
+    { value: "ОП Москва", label: "Счетчики (ОП Москва)" },
   ];
 
-  const filteredData = selectedType
-    ? allData.filter(
-        (item) => item["Наименование продукции"] === selectedType.value
-      )
-    : [];
-
-  const doughnutData = {
-    labels: ["Процент выполнения плана", "Оставшаяся часть"],
-    datasets: [
-      {
-        data: [
-          filteredData.length > 0
-            ? filteredData[0][
-                `Фактический % выполнения плана - ${
-                  selectedMetric.split(" - ")[1]
-                }`
-              ] || 0
+  // Обновляем данные при изменении фильтра
+  useEffect(() => {
+    if (selectedFactory.value === "всего") {
+      setFilteredSummary(summary);
+    } else {
+      const filtered = summary.map((item) => ({
+        ...item,
+        "Сдача на склад сбыта - Маркс":
+          selectedFactory.value === "Маркс"
+            ? item["Сдача на склад сбыта - Маркс"]
             : 0,
-          100 -
-            (filteredData.length > 0
-              ? filteredData[0][
-                  `Фактический % выполнения плана - ${
-                    selectedMetric.split(" - ")[1]
-                  }`
-                ] || 0
-              : 0),
-        ],
-        backgroundColor: (context) => {
-          const percentage =
-            filteredData.length > 0
-              ? filteredData[0][
-                  `Фактический % выполнения плана - ${
-                    selectedMetric.split(" - ")[1]
-                  }`
-                ] || 0
-              : 0;
+        "Сдача на склад сбыта - ОП Москва":
+          selectedFactory.value === "ОП Москва"
+            ? item["Сдача на склад сбыта - ОП Москва"]
+            : 0,
+      }));
+      setFilteredSummary(filtered);
+    }
+  }, [selectedFactory, summary]);
 
-          const gradient = context.chart.ctx.createLinearGradient(
-            0,
-            0,
-            200,
-            200
-          );
-          gradient.addColorStop(0, "red");
-          gradient.addColorStop(0.5, "yellow");
-          gradient.addColorStop(1, "green");
+  const getDoughnutData = (type) => {
+    const dataItem = filteredSummary.find(
+      (item) => item["Наименование продукции"] === type
+    );
+    if (!dataItem) return null;
 
-          return [gradient, "rgba(200, 200, 200, 0.2)"];
+    const planValue = parseFloat(dataItem["Плановый % сдачи на склад"]) || 0;
+    const actualValue =
+      parseFloat(dataItem["Фактический % выполнения плана - всего"]) || 0;
+
+    let color = "green";
+    if (actualValue < planValue) {
+      color = "red";
+    } else if (actualValue < 100) {
+      color = "yellow";
+    }
+
+    return {
+      labels: ["Выполнено", "Остаток"],
+      datasets: [
+        {
+          data: [actualValue, 100 - actualValue],
+          backgroundColor: [color, "rgba(200, 200, 200, 0.2)"],
         },
-        hoverOffset: 4,
-      },
-    ],
+      ],
+    };
   };
 
   const barData = {
-    labels: summary.map((item) => item["Наименование продукции"]),
+    labels: filteredSummary.map((item) => item["Наименование продукции"]),
     datasets: [
       {
-        label: selectedSummaryMetric,
-        data: summary.map((item) => {
-          const value = item[selectedSummaryMetric] || 0;
-
-          // Увеличиваем видимость "Итого (сетевое оборудование)"
-          if (
-            item["Наименование продукции"] === "Итого (сетевое оборудование)"
-          ) {
-            return value * 10; // Увеличение значения
-          }
-          return value;
-        }),
-        backgroundColor: (context) => {
-          const gradient = context.chart.ctx.createLinearGradient(0, 0, 0, 300);
-          gradient.addColorStop(0, "red");
-          gradient.addColorStop(0.5, "yellow");
-          gradient.addColorStop(1, "green");
-          return gradient;
-        },
+        label: "Всего",
+        data: filteredSummary.map(
+          (item) => item["Сдача на склад сбыта - всего"]
+        ),
+        backgroundColor: "rgba(75, 192, 192, 0.6)",
+      },
+      {
+        label: "Маркс",
+        data: filteredSummary.map(
+          (item) => item["Сдача на склад сбыта - Маркс"]
+        ),
+        backgroundColor: "rgba(255, 99, 132, 0.6)",
+      },
+      {
+        label: "ОП Москва",
+        data: filteredSummary.map(
+          (item) => item["Сдача на склад сбыта - ОП Москва"]
+        ),
+        backgroundColor: "rgba(54, 162, 235, 0.6)",
       },
     ],
   };
@@ -152,7 +164,13 @@ function UploadPage() {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-3xl font-bold mb-4 text-center">Аналитика данных</h1>
-      <form onSubmit={handleSubmit} className="mb-4 flex gap-4 items-center">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleUpload();
+        }}
+        className="mb-4 flex gap-4 items-center"
+      >
         <input
           type="file"
           ref={fileInputRef}
@@ -163,53 +181,50 @@ function UploadPage() {
           type="submit"
           className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
         >
-          Загрузить
+          {isLoading ? "Загружается..." : "Загрузить"}
         </button>
       </form>
 
       {error && <p className="text-red-500">{error}</p>}
-      {status && <p className="text-gray-700">{status}</p>}
 
-      {allData.length > 0 && (
-        <div>
-          <div className="my-4">
-            <Select
-              options={filterOptions}
-              onChange={setSelectedType}
-              placeholder="Выберите номенклатуру..."
-              isClearable
-            />
-            <Select
-              options={metricOptions}
-              onChange={(option) => setSelectedMetric(option?.value || "")}
-              placeholder="Выберите показатель..."
-              defaultValue={metricOptions[0]}
-            />
-          </div>
+      <div className="my-4">
+        <Select
+          options={factoryOptions}
+          onChange={(option) => setSelectedFactory(option)}
+          value={selectedFactory}
+          placeholder="Выберите завод..."
+          isClearable
+        />
+      </div>
 
-          {selectedType && (
-            <div className="bg-white p-4 rounded shadow">
-              <h2 className="text-2xl font-bold mb-4">
-                Круговая диаграмма по показателям
-              </h2>
-              <Doughnut data={doughnutData} />
-            </div>
-          )}
+      {/* Круговые диаграммы */}
+      <h2 className="text-2xl font-bold mb-4">
+        Итоговые показатели выполнения плана в %
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {[
+          "Итого (однофазные)",
+          "Итого (трехфазные)",
+          "Итого (перепрошивка)",
+          "ВСЕГО", // Добавлен обратно "ВСЕГО"
+        ].map((type) => {
+          const doughnutData = getDoughnutData(type);
+          return (
+            doughnutData && (
+              <div key={type} className="bg-white p-4 rounded shadow">
+                <h2 className="text-xl font-bold mb-2">{type}</h2>
+                <Doughnut data={doughnutData} />
+              </div>
+            )
+          );
+        })}
+      </div>
 
-          <div className="bg-white p-4 rounded shadow mt-6">
-            <h2 className="text-2xl font-bold mb-4">Итоговые показатели</h2>
-            <Select
-              options={metricOptions}
-              onChange={(option) =>
-                setSelectedSummaryMetric(option?.value || "")
-              }
-              placeholder="Выберите фильтр..."
-              defaultValue={metricOptions[1]}
-            />
-            <Bar data={barData} />
-          </div>
-        </div>
-      )}
+      {/* Столбчатый график */}
+      <div className="bg-white p-4 rounded shadow mt-6">
+        <h2 className="text-2xl font-bold mb-4">Итоговые показатели</h2>
+        <Bar data={barData} />
+      </div>
     </div>
   );
 }

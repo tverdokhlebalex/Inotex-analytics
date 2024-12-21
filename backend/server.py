@@ -66,6 +66,12 @@ def process_excel_file(file_path):
             processed_data["Наименование продукции"].str.strip().isin(summary_keywords)
         ]
 
+        # Удаляем строки без данных "ВСЕГО"
+        if "ВСЕГО" not in summary_rows["Наименование продукции"].values:
+            total_row = processed_data.iloc[processed_data.index[-1]].to_dict()
+            total_row["Наименование продукции"] = "ВСЕГО"
+            summary_rows = pd.concat([summary_rows, pd.DataFrame([total_row])], ignore_index=True)
+
         # Исключаем итоговые строки из всех данных
         main_data = processed_data[
             ~processed_data["Наименование продукции"].str.strip().isin(summary_keywords)
