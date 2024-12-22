@@ -128,22 +128,14 @@ function UploadPage() {
 
       const filtered = summary.map((item) => ({
         ...item,
-        // Обнуляем ненужные значения для корректного отображения диаграммы
-        "Фактический % выполнения плана - всего":
-          selectedFactoryPercent.value === "всего"
-            ? item["Фактический % выполнения плана - всего"]
-            : 0,
         // Добавляем фактическое значение для выбранного завода
-        [actualField]: item[actualField],
-        // Добавляем плановый процент для выбранного завода
-        "Плановый % сдачи на склад":
-          selectedFactoryPercent.value === "всего"
-            ? planPercent
-            : item[planField],
+        [actualField]: parseFloat(item[actualField]) || 0,
+        // Плановый % всегда из Y4
+        planPercent: planPercent,
       }));
       setFilteredSummaryPercent(filtered);
     }
-  }, [selectedFactoryPercent, summary, planPercent, factoryMapping]);
+  }, [selectedFactoryPercent, summary, planPercent]);
 
   // Обновляем данные для единиц при изменении фильтра
   useEffect(() => {
@@ -156,23 +148,15 @@ function UploadPage() {
 
       const filtered = summary.map((item) => ({
         ...item,
-        // Обнуляем ненужные значения для корректного отображения графика
-        "Сдача на склад сбыта - всего":
-          selectedFactoryUnits.value === "всего"
-            ? item["Сдача на склад сбыта - всего"]
-            : 0,
         // Добавляем фактическое значение для выбранного завода
-        [unitsActualField]: item[unitsActualField],
-        // Добавляем плановую сдачу для выбранного завода
-        "Плановая сдача на склад":
-          selectedFactoryUnits.value === "всего"
-            ? item["Плановый % сдачи на склад"]
-            : item[unitsPlanField],
+        [unitsActualField]: parseFloat(item[unitsActualField]) || 0,
+        // Плановые единицы из соответствующего поля
+        unitsPlan: parseFloat(item[unitsPlanField]) || 0,
       }));
 
       setFilteredSummaryUnits(filtered);
     }
-  }, [selectedFactoryUnits, summary, factoryMapping]);
+  }, [selectedFactoryUnits, summary]);
 
   // Функция для получения данных для Doughnut диаграммы
   const getDoughnutData = (item) => {
@@ -183,29 +167,31 @@ function UploadPage() {
         parseFloat(item["Фактический % выполнения плана - всего"]) || 0;
       planValue = planPercent;
     } else {
-      actualValue =
-        parseFloat(
-          item[factoryMapping[selectedFactoryPercent.value].actualField]
-        ) || 0;
-      planValue = parseFloat(item["Плановый % сдачи на склад"]) || 0;
+      const mapping = factoryMapping[selectedFactoryPercent.value];
+      actualValue = parseFloat(item[mapping.actualField]) || 0;
+      planValue = planPercent; // Плановый % всегда из Y4
     }
 
-    // Определение цвета диаграммы
+    console.log(
+      `Type: ${item["Наименование продукции"]}, Actual: ${actualValue}, Plan: ${planValue}`
+    );
+
+    // Определение цвета диаграммы без прозрачности
     let color;
     if (actualValue < planValue) {
-      color = "rgba(252, 0, 0, 0.6)"; // Красный
+      color = "rgb(252, 0, 0)"; // Красный
     } else if (actualValue >= planValue && actualValue < 100) {
-      color = "rgba(251, 255, 0, 0.6)"; // Жёлтый
+      color = "rgb(251, 255, 0)"; // Жёлтый
     } else if (actualValue >= 100) {
-      color = "rgba(0, 255, 42, 0.6)"; // Зелёный
+      color = "rgb(0, 255, 42)"; // Зелёный
     }
 
     return {
       labels: ["Выполнено", "Остаток"],
       datasets: [
         {
-          data: [actualValue, 100 - actualValue],
-          backgroundColor: [color, "rgba(200, 200, 200, 0.2)"],
+          data: [actualValue, Math.max(100 - actualValue, 0)],
+          backgroundColor: [color, "rgb(200, 200, 200)"], // Без прозрачности
           borderWidth: 1,
         },
       ],
@@ -247,8 +233,8 @@ function UploadPage() {
                   : item["Плановый % сдачи на склад - ОП Москва"];
             }
             return actual >= plan
-              ? "rgba(0, 255, 42, 0.6)" // Зелёный
-              : "rgba(252, 0, 0, 0.6)"; // Красный
+              ? "rgb(0, 255, 42)" // Зелёный
+              : "rgb(252, 0, 0)"; // Красный
           }),
         },
         {
@@ -262,7 +248,7 @@ function UploadPage() {
                 : item["Плановый % сдачи на склад - ОП Москва"] || 0;
             }
           }),
-          backgroundColor: "rgba(0, 26, 255, 0.6)", // Синий для плановых
+          backgroundColor: "rgb(0, 26, 255)", // Синий для плановых без прозрачности
         },
       ],
     };
@@ -312,8 +298,8 @@ function UploadPage() {
             className="w-1/2 md:w-1/4"
           />
         </div>
-        {/* Круговые диаграммы */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Круговые диаграммы, расположенные по 2 в линию */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
             "Итого (однофазные)",
             "Итого (трехфазные)",
@@ -326,11 +312,41 @@ function UploadPage() {
             const doughnutData = item ? getDoughnutData(item) : null;
             return (
               doughnutData && (
-                <div key={type} className="bg-white p-4 rounded shadow">
+                <div
+                  key={type}
+                  className="bg-white p-4 rounded shadow h-80 flex flex-col"
+                >
                   <h3 className="text-xl font-semibold mb-2 text-center">
                     {type}
                   </h3>
-                  <Doughnut data={doughnutData} />
+                  <div className="flex-1">
+                    <Doughnut
+                      data={doughnutData}
+                      options={{
+                        plugins: {
+                          tooltip: {
+                            callbacks: {
+                              label: function (context) {
+                                const label = context.label || "";
+                                const value = context.parsed;
+                                return `${label}: ${value}%`;
+                              },
+                            },
+                          },
+                          title: {
+                            display: true,
+                            text: `Факт: ${doughnutData.datasets[0].data[0]}%, План: ${planPercent}%`,
+                            font: {
+                              size: 14,
+                            },
+                          },
+                        },
+                        maintainAspectRatio: false,
+                        cutout: "70%", // Сделать кольцо уже
+                      }}
+                      height={300} // Увеличить высоту диаграммы
+                    />
+                  </div>
                 </div>
               )
             );
@@ -355,7 +371,7 @@ function UploadPage() {
           />
         </div>
         {/* Столбчатый график */}
-        <div className="bg-white p-4 rounded shadow">
+        <div className="bg-white p-4 rounded shadow h-80">
           <Bar
             data={getBarDataUnits()}
             options={{
@@ -369,7 +385,14 @@ function UploadPage() {
                   text: "Фактические vs Плановые показатели",
                 },
               },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                },
+              },
+              maintainAspectRatio: false,
             }}
+            height={300} // Увеличить высоту диаграммы
           />
         </div>
       </div>
