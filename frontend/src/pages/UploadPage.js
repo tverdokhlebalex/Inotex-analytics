@@ -134,36 +134,40 @@ function UploadPage() {
     };
   };
 
-  const barData = {
-    labels: filteredSummary.map((item) => item["Наименование продукции"]),
-    datasets: [
-      {
-        label: "Всего",
-        data: filteredSummary.map(
-          (item) => item["Сдача на склад сбыта - всего"]
-        ),
-        backgroundColor: "rgba(75, 192, 192, 0.6)",
-      },
-      {
-        label: "Маркс",
-        data: filteredSummary.map(
-          (item) => item["Сдача на склад сбыта - Маркс"]
-        ),
-        backgroundColor: "rgba(255, 99, 132, 0.6)",
-      },
-      {
-        label: "ОП Москва",
-        data: filteredSummary.map(
-          (item) => item["Сдача на склад сбыта - ОП Москва"]
-        ),
-        backgroundColor: "rgba(54, 162, 235, 0.6)",
-      },
-    ],
+  const getBarData = (type) => {
+    return {
+      labels: filteredSummary.map((item) => item["Наименование продукции"]),
+      datasets: [
+        {
+          label: "Всего",
+          data: filteredSummary.map(
+            (item) => item["Сдача на склад сбыта - всего"]
+          ),
+          backgroundColor: "rgba(75, 192, 192, 0.6)",
+        },
+        {
+          label: "Маркс",
+          data: filteredSummary.map(
+            (item) => item["Сдача на склад сбыта - Маркс"]
+          ),
+          backgroundColor: "rgba(255, 99, 132, 0.6)",
+        },
+        {
+          label: "ОП Москва",
+          data: filteredSummary.map(
+            (item) => item["Сдача на склад сбыта - ОП Москва"]
+          ),
+          backgroundColor: "rgba(54, 162, 235, 0.6)",
+        },
+      ],
+    };
   };
 
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-3xl font-bold mb-4 text-center">Аналитика данных</h1>
+
+      {/* Загрузка файла */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -187,6 +191,7 @@ function UploadPage() {
 
       {error && <p className="text-red-500">{error}</p>}
 
+      {/* Фильтр заводов */}
       <div className="my-4">
         <Select
           options={factoryOptions}
@@ -197,7 +202,7 @@ function UploadPage() {
         />
       </div>
 
-      {/* Круговые диаграммы */}
+      {/* Круговые диаграммы: Итоговые показатели выполнения плана в % */}
       <h2 className="text-2xl font-bold mb-4">
         Итоговые показатели выполнения плана в %
       </h2>
@@ -206,7 +211,7 @@ function UploadPage() {
           "Итого (однофазные)",
           "Итого (трехфазные)",
           "Итого (перепрошивка)",
-          "ВСЕГО", // Добавлен обратно "ВСЕГО"
+          "ВСЕГО",
         ].map((type) => {
           const doughnutData = getDoughnutData(type);
           return (
@@ -220,10 +225,12 @@ function UploadPage() {
         })}
       </div>
 
-      {/* Столбчатый график */}
+      {/* Столбчатый график: Итоговые показатели */}
       <div className="bg-white p-4 rounded shadow mt-6">
-        <h2 className="text-2xl font-bold mb-4">Итоговые показатели</h2>
-        <Bar data={barData} />
+        <h2 className="text-2xl font-bold mb-4">
+          Итоговые показатели в единицах сбыта
+        </h2>
+        <Bar data={getBarData()} />
       </div>
     </div>
   );
