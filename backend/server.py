@@ -17,7 +17,7 @@ app = FastAPI()
 # Настройка CORS для взаимодействия с фронтендом
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Лучше ограничить конкретными доменами в продакшене
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,10 +32,16 @@ class LoginRequest(BaseModel):
 def process_excel_file(file_path):
     """
     Обрабатывает Excel-файл:
-    - Считывает данные из определённых столбцов.
-    - Разделяет на все данные и итоговые строки.
+    - Считывает плановый процент выполнения из ячейки Y4.
+    - Считывает данные начиная с 11 строки (skiprows=10).
+    - Извлекает необходимые столбцы.
+    - Формирует итоговые строки, исключая ненужные.
     """
     try:
+        # Чтение всего файла для извлечения планового процента из Y4
+        full_df = pd.read_excel(file_path, header=None)
+        plan_percent = full_df.at[3, 24]  # Ячейка Y4 (индексация с 0)
+
         # Чтение данных начиная с 11 строки (skiprows=10)
         df = pd.read_excel(file_path, skiprows=10)
 
@@ -45,6 +51,9 @@ def process_excel_file(file_path):
             "Сдача на склад сбыта - всего": df.iloc[:, 21].fillna(0),  # Столбец V
             "Сдача на склад сбыта - Маркс": df.iloc[:, 22].fillna(0),  # Столбец W
             "Сдача на склад сбыта - ОП Москва": df.iloc[:, 23].fillna(0),  # Столбец X
+            "Плановый % сдачи на склад": df.iloc[:, 12].fillna(0),  # Столбец M (План отгрузки всего)
+            "Плановый % сдачи на склад - Маркс": df.iloc[:, 13].fillna(0),  # Столбец N (План отгрузки Маркс)
+            "Плановый % сдачи на склад - ОП Москва": df.iloc[:, 14].fillna(0),  # Столбец O (План отгрузки ОП Москва)
             "Фактический % выполнения плана - всего": df.iloc[:, 24].fillna(0),  # Столбец Y
             "Фактический % выполнения плана - Маркс": df.iloc[:, 25].fillna(0),  # Столбец Z
             "Фактический % выполнения плана - ОП Москва": df.iloc[:, 26].fillna(0),  # Столбец AA
@@ -53,12 +62,10 @@ def process_excel_file(file_path):
         # Создаём DataFrame
         processed_data = pd.DataFrame(data)
 
-        # Выделение итоговых строк по ключевым словам
+        # Выделение итоговых строк по ключевым словам, исключая ненужные
         summary_keywords = [
             "Итого (однофазные)",
             "Итого (трехфазные)",
-            "Итого (сетевое оборудование)",
-            "Итого (муляжи)",
             "Итого (перепрошивка)",
             "ВСЕГО",
         ]
@@ -68,22 +75,16 @@ def process_excel_file(file_path):
 
         # Удаляем строки без данных "ВСЕГО"
         if "ВСЕГО" not in summary_rows["Наименование продукции"].values:
-            total_row = processed_data.iloc[processed_data.index[-1]].to_dict()
+            total_row = processed_data.iloc[-1].to_dict()
             total_row["Наименование продукции"] = "ВСЕГО"
             summary_rows = pd.concat([summary_rows, pd.DataFrame([total_row])], ignore_index=True)
 
-        # Исключаем итоговые строки из всех данных
-        main_data = processed_data[
-            ~processed_data["Наименование продукции"].str.strip().isin(summary_keywords)
-        ]
-
         # Очистка бесконечностей и null
-        main_data.replace([float("inf"), float("-inf")], 0, inplace=True)
         summary_rows.replace([float("inf"), float("-inf")], 0, inplace=True)
 
         logger.info("Файл успешно обработан.")
         return {
-            "all_data": main_data.to_dict(orient="records"),
+            "plan_percent": plan_percent,
             "summary": summary_rows.to_dict(orient="records"),
         }
 
@@ -112,7 +113,7 @@ async def upload_file(file: UploadFile = File(...)):
         return JSONResponse(
             content={
                 "message": "Файл успешно обработан",
-                "all_data": result["all_data"],
+                "plan_percent": result["plan_percent"],
                 "summary": result["summary"],
             },
             status_code=200,

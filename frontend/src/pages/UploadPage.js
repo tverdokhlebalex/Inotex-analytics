@@ -8,11 +8,17 @@ import "chart.js/auto";
 function UploadPage() {
   const [file, setFile] = useState(null);
   const [summary, setSummary] = useState([]);
-  const [filteredSummary, setFilteredSummary] = useState([]);
-  const [selectedFactory, setSelectedFactory] = useState({
+  const [filteredSummaryPercent, setFilteredSummaryPercent] = useState([]);
+  const [filteredSummaryUnits, setFilteredSummaryUnits] = useState([]);
+  const [selectedFactoryPercent, setSelectedFactoryPercent] = useState({
     value: "всего",
     label: "Всего",
   });
+  const [selectedFactoryUnits, setSelectedFactoryUnits] = useState({
+    value: "всего",
+    label: "Всего",
+  });
+  const [planPercent, setPlanPercent] = useState(0); // Плановый % сдачи на склад
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -48,6 +54,8 @@ function UploadPage() {
       );
 
       const rawSummary = response.data.summary;
+      const planPercentValue = parseFloat(response.data.plan_percent) || 0;
+      setPlanPercent(planPercentValue);
 
       // Проверяем, существует ли уже строка "ВСЕГО"
       const hasTotal = rawSummary.some(
@@ -62,7 +70,7 @@ function UploadPage() {
         }
       }
 
-      // Фильтруем итоговые строки
+      // Фильтруем итоговые строки, удаляя ненужные
       const filteredData = rawSummary.filter(
         (row) =>
           row["Наименование продукции"] === "Итого (однофазные)" ||
@@ -72,7 +80,8 @@ function UploadPage() {
       );
 
       setSummary(filteredData);
-      setFilteredSummary(filteredData);
+      setFilteredSummaryPercent(filteredData);
+      setFilteredSummaryUnits(filteredData);
       setIsLoading(false);
     } catch (err) {
       setError("Ошибка загрузки файла. Проверьте структуру файла.");
@@ -86,35 +95,73 @@ function UploadPage() {
     { value: "ОП Москва", label: "Счетчики (ОП Москва)" },
   ];
 
-  // Обновляем данные при изменении фильтра
+  // Обновляем данные для процентов при изменении фильтра
   useEffect(() => {
-    if (selectedFactory.value === "всего") {
-      setFilteredSummary(summary);
+    if (selectedFactoryPercent.value === "всего") {
+      setFilteredSummaryPercent(summary);
     } else {
+      const factoryKey =
+        selectedFactoryPercent.value === "Маркс"
+          ? "Сдача на склад сбыта - Маркс"
+          : "Сдача на склад сбыта - ОП Москва";
+
       const filtered = summary.map((item) => ({
         ...item,
-        "Сдача на склад сбыта - Маркс":
-          selectedFactory.value === "Маркс"
-            ? item["Сдача на склад сбыта - Маркс"]
+        // Обнуляем ненужные значения
+        "Сдача на склад сбыта - всего":
+          selectedFactoryPercent.value === "всего"
+            ? item["Сдача на склад сбыта - всего"]
             : 0,
-        "Сдача на склад сбыта - ОП Москва":
-          selectedFactory.value === "ОП Москва"
-            ? item["Сдача на склад сбыта - ОП Москва"]
-            : 0,
+        [factoryKey]: item[factoryKey],
       }));
-      setFilteredSummary(filtered);
+      setFilteredSummaryPercent(filtered);
     }
-  }, [selectedFactory, summary]);
+  }, [selectedFactoryPercent, summary]);
+
+  // Обновляем данные для единиц при изменении фильтра
+  useEffect(() => {
+    if (selectedFactoryUnits.value === "всего") {
+      setFilteredSummaryUnits(summary);
+    } else {
+      const factoryKey =
+        selectedFactoryUnits.value === "Маркс"
+          ? "Сдача на склад сбыта - Маркс"
+          : "Сдача на склад сбыта - ОП Москва";
+
+      const planKey =
+        selectedFactoryUnits.value === "Маркс"
+          ? "Плановый % сдачи на склад - Маркс"
+          : "Плановый % сдачи на склад - ОП Москва";
+
+      const filtered = summary.map((item) => ({
+        ...item,
+        // Обнуляем ненужные значения
+        "Сдача на склад сбыта - всего":
+          selectedFactoryUnits.value === "всего"
+            ? item["Сдача на склад сбыта - всего"]
+            : 0,
+        [factoryKey]: item[factoryKey],
+        [`Плановая сдача на склад - ${selectedFactoryUnits.value}`]:
+          selectedFactoryUnits.value === "всего"
+            ? item["Плановый % сдачи на склад"]
+            : item[planKey],
+      }));
+
+      setFilteredSummaryUnits(filtered);
+    }
+  }, [selectedFactoryUnits, summary]);
 
   const getDoughnutData = (type) => {
-    const dataItem = filteredSummary.find(
+    const dataItem = filteredSummaryPercent.find(
       (item) => item["Наименование продукции"] === type
     );
     if (!dataItem) return null;
 
-    const planValue = parseFloat(dataItem["Плановый % сдачи на склад"]) || 0;
     const actualValue =
       parseFloat(dataItem["Фактический % выполнения плана - всего"]) || 0;
+
+    // Используем общеплановый процент
+    const planValue = planPercent;
 
     let color = "green";
     if (actualValue < planValue) {
@@ -129,35 +176,44 @@ function UploadPage() {
         {
           data: [actualValue, 100 - actualValue],
           backgroundColor: [color, "rgba(200, 200, 200, 0.2)"],
+          borderWidth: 1,
         },
       ],
     };
   };
 
-  const getBarData = (type) => {
+  const getBarDataUnits = () => {
     return {
-      labels: filteredSummary.map((item) => item["Наименование продукции"]),
+      labels: filteredSummaryUnits.map(
+        (item) => item["Наименование продукции"]
+      ),
       datasets: [
         {
-          label: "Всего",
-          data: filteredSummary.map(
+          label: "Фактические",
+          data: filteredSummaryUnits.map(
             (item) => item["Сдача на склад сбыта - всего"]
           ),
-          backgroundColor: "rgba(75, 192, 192, 0.6)",
+          backgroundColor: filteredSummaryUnits.map((item) => {
+            const actual = item["Сдача на склад сбыта - всего"];
+            const plan =
+              selectedFactoryUnits.value === "всего"
+                ? item["Плановый % сдачи на склад"]
+                : item[
+                    `Плановая сдача на склад - ${selectedFactoryUnits.value}`
+                  ];
+            return actual >= plan
+              ? "rgba(75, 192, 192, 0.6)"
+              : "rgba(255, 99, 132, 0.6)";
+          }),
         },
         {
-          label: "Маркс",
-          data: filteredSummary.map(
-            (item) => item["Сдача на склад сбыта - Маркс"]
+          label: "Плановые",
+          data: filteredSummaryUnits.map((item) =>
+            selectedFactoryUnits.value === "всего"
+              ? item["Плановый % сдачи на склад"]
+              : item[`Плановая сдача на склад - ${selectedFactoryUnits.value}`]
           ),
-          backgroundColor: "rgba(255, 99, 132, 0.6)",
-        },
-        {
-          label: "ОП Москва",
-          data: filteredSummary.map(
-            (item) => item["Сдача на склад сбыта - ОП Москва"]
-          ),
-          backgroundColor: "rgba(54, 162, 235, 0.6)",
+          backgroundColor: "rgba(153, 102, 255, 0.6)",
         },
       ],
     };
@@ -173,64 +229,97 @@ function UploadPage() {
           e.preventDefault();
           handleUpload();
         }}
-        className="mb-4 flex gap-4 items-center"
+        className="mb-4 flex flex-col md:flex-row gap-4 items-center justify-center"
       >
         <input
           type="file"
           ref={fileInputRef}
           onChange={handleFileChange}
-          className="p-2 border rounded w-1/3"
+          className="p-2 border rounded w-full md:w-1/3"
         />
         <button
           type="submit"
-          className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+          className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 w-full md:w-auto"
         >
           {isLoading ? "Загружается..." : "Загрузить"}
         </button>
       </form>
 
-      {error && <p className="text-red-500">{error}</p>}
+      {error && <p className="text-red-500 text-center">{error}</p>}
 
-      {/* Фильтр заводов */}
-      <div className="my-4">
-        <Select
-          options={factoryOptions}
-          onChange={(option) => setSelectedFactory(option)}
-          value={selectedFactory}
-          placeholder="Выберите завод..."
-          isClearable
-        />
+      {/* Блок аналитики 1: Итоговые показатели выполнения плана в % */}
+      <div className="my-8">
+        <h2 className="text-2xl font-bold mb-4 text-center">
+          Итоговые показатели выполнения плана в %
+        </h2>
+        {/* Фильтр заводов для процентов */}
+        <div className="mb-4 flex justify-center">
+          <Select
+            options={factoryOptions}
+            onChange={(option) => setSelectedFactoryPercent(option)}
+            value={selectedFactoryPercent}
+            placeholder="Выберите завод..."
+            isClearable
+            className="w-1/2 md:w-1/4"
+          />
+        </div>
+        {/* Круговые диаграммы */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[
+            "Итого (однофазные)",
+            "Итого (трехфазные)",
+            "Итого (перепрошивка)",
+            "ВСЕГО",
+          ].map((type) => {
+            const doughnutData = getDoughnutData(type);
+            return (
+              doughnutData && (
+                <div key={type} className="bg-white p-4 rounded shadow">
+                  <h3 className="text-xl font-semibold mb-2 text-center">
+                    {type}
+                  </h3>
+                  <Doughnut data={doughnutData} />
+                </div>
+              )
+            );
+          })}
+        </div>
       </div>
 
-      {/* Круговые диаграммы: Итоговые показатели выполнения плана в % */}
-      <h2 className="text-2xl font-bold mb-4">
-        Итоговые показатели выполнения плана в %
-      </h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {[
-          "Итого (однофазные)",
-          "Итого (трехфазные)",
-          "Итого (перепрошивка)",
-          "ВСЕГО",
-        ].map((type) => {
-          const doughnutData = getDoughnutData(type);
-          return (
-            doughnutData && (
-              <div key={type} className="bg-white p-4 rounded shadow">
-                <h2 className="text-xl font-bold mb-2">{type}</h2>
-                <Doughnut data={doughnutData} />
-              </div>
-            )
-          );
-        })}
-      </div>
-
-      {/* Столбчатый график: Итоговые показатели */}
-      <div className="bg-white p-4 rounded shadow mt-6">
-        <h2 className="text-2xl font-bold mb-4">
+      {/* Блок аналитики 2: Итоговые показатели в единицах сбыта */}
+      <div className="my-8">
+        <h2 className="text-2xl font-bold mb-4 text-center">
           Итоговые показатели в единицах сбыта
         </h2>
-        <Bar data={getBarData()} />
+        {/* Фильтр заводов для единиц */}
+        <div className="mb-4 flex justify-center">
+          <Select
+            options={factoryOptions}
+            onChange={(option) => setSelectedFactoryUnits(option)}
+            value={selectedFactoryUnits}
+            placeholder="Выберите завод..."
+            isClearable
+            className="w-1/2 md:w-1/4"
+          />
+        </div>
+        {/* Столбчатый график */}
+        <div className="bg-white p-4 rounded shadow">
+          <Bar
+            data={getBarDataUnits()}
+            options={{
+              responsive: true,
+              plugins: {
+                legend: {
+                  position: "top",
+                },
+                title: {
+                  display: true,
+                  text: "Фактические vs Плановые показатели",
+                },
+              },
+            }}
+          />
+        </div>
       </div>
     </div>
   );
