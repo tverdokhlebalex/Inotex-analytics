@@ -337,14 +337,14 @@ function UploadPage() {
                           },
                           title: {
                             display: true,
-                            text: `Факт: ${doughnutData.datasets[0].data[0]}%, План: ${planPercent}%`,
+                            text: `Фактический процент сдачи на склад: ${doughnutData.datasets[0].data[0]}%, Плановый процент сдачи на склад: ${planPercent}%`,
                             font: {
                               size: 14,
                             },
                           },
                         },
                         maintainAspectRatio: false,
-                        cutout: "80%", // Сделать кольцо уже
+                        cutout: "80%",
                       }}
                       height={300} // Увеличить высоту диаграммы
                     />
@@ -394,7 +394,7 @@ function UploadPage() {
               },
               maintainAspectRatio: false,
             }}
-            height={660} // Увеличить высоту графика в 2.2 раза
+            height={660}
           />
         </div>
       </div>
