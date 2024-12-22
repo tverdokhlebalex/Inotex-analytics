@@ -1,3 +1,5 @@
+// src/UploadPage.jsx
+
 import React, { useState, useContext, useRef, useEffect } from "react";
 import axios from "axios";
 import { AuthContext } from "../contexts/AuthContext";
@@ -314,7 +316,7 @@ function UploadPage() {
               doughnutData && (
                 <div
                   key={type}
-                  className="bg-white p-4 rounded shadow h-80 flex flex-col"
+                  className="bg-white p-4 rounded shadow h-[22.5rem] flex flex-col"
                 >
                   <h3 className="text-xl font-semibold mb-2 text-center">
                     {type}
@@ -342,7 +344,7 @@ function UploadPage() {
                           },
                         },
                         maintainAspectRatio: false,
-                        cutout: "70%", // Сделать кольцо уже
+                        cutout: "80%", // Сделать кольцо уже
                       }}
                       height={300} // Увеличить высоту диаграммы
                     />
@@ -371,7 +373,7 @@ function UploadPage() {
           />
         </div>
         {/* Столбчатый график */}
-        <div className="bg-white p-4 rounded shadow h-80">
+        <div className="bg-white p-4 rounded shadow h-[44rem]">
           <Bar
             data={getBarDataUnits()}
             options={{
@@ -392,7 +394,7 @@ function UploadPage() {
               },
               maintainAspectRatio: false,
             }}
-            height={300} // Увеличить высоту диаграммы
+            height={660} // Увеличить высоту графика в 2.2 раза
           />
         </div>
       </div>
