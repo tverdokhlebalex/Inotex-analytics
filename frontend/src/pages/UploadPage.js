@@ -25,6 +25,28 @@ function UploadPage() {
   const { authToken } = useContext(AuthContext);
   const fileInputRef = useRef(null);
 
+  // Mapping factories to their corresponding fields
+  const factoryMapping = {
+    всего: {
+      actualField: "Фактический % выполнения плана - всего",
+      planField: "Плановый % сдачи на склад",
+      unitsActualField: "Сдача на склад сбыта - всего",
+      unitsPlanField: "Плановый % сдачи на склад",
+    },
+    Маркс: {
+      actualField: "Фактический % выполнения плана - Маркс",
+      planField: "Плановый % сдачи на склад - Маркс",
+      unitsActualField: "Сдача на склад сбыта - Маркс",
+      unitsPlanField: "Плановый % сдачи на склад - Маркс",
+    },
+    "ОП Москва": {
+      actualField: "Фактический % выполнения плана - ОП Москва",
+      planField: "Плановый % сдачи на склад - ОП Москва",
+      unitsActualField: "Сдача на склад сбыта - ОП Москва",
+      unitsPlanField: "Плановый % сдачи на склад - ОП Москва",
+    },
+  };
+
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
   };
@@ -97,77 +119,85 @@ function UploadPage() {
 
   // Обновляем данные для процентов при изменении фильтра
   useEffect(() => {
+    const mapping = factoryMapping[selectedFactoryPercent.value];
+
     if (selectedFactoryPercent.value === "всего") {
       setFilteredSummaryPercent(summary);
     } else {
-      const factoryKey =
-        selectedFactoryPercent.value === "Маркс"
-          ? "Сдача на склад сбыта - Маркс"
-          : "Сдача на склад сбыта - ОП Москва";
+      const { actualField, planField } = mapping;
 
       const filtered = summary.map((item) => ({
         ...item,
-        // Обнуляем ненужные значения
-        "Сдача на склад сбыта - всего":
+        // Обнуляем ненужные значения для корректного отображения диаграммы
+        "Фактический % выполнения плана - всего":
           selectedFactoryPercent.value === "всего"
-            ? item["Сдача на склад сбыта - всего"]
+            ? item["Фактический % выполнения плана - всего"]
             : 0,
-        [factoryKey]: item[factoryKey],
+        // Добавляем фактическое значение для выбранного завода
+        [actualField]: item[actualField],
+        // Добавляем плановый процент для выбранного завода
+        "Плановый % сдачи на склад":
+          selectedFactoryPercent.value === "всего"
+            ? planPercent
+            : item[planField],
       }));
       setFilteredSummaryPercent(filtered);
     }
-  }, [selectedFactoryPercent, summary]);
+  }, [selectedFactoryPercent, summary, planPercent, factoryMapping]);
 
   // Обновляем данные для единиц при изменении фильтра
   useEffect(() => {
+    const mapping = factoryMapping[selectedFactoryUnits.value];
+
     if (selectedFactoryUnits.value === "всего") {
       setFilteredSummaryUnits(summary);
     } else {
-      const factoryKey =
-        selectedFactoryUnits.value === "Маркс"
-          ? "Сдача на склад сбыта - Маркс"
-          : "Сдача на склад сбыта - ОП Москва";
-
-      const planKey =
-        selectedFactoryUnits.value === "Маркс"
-          ? "Плановый % сдачи на склад - Маркс"
-          : "Плановый % сдачи на склад - ОП Москва";
+      const { unitsActualField, unitsPlanField } = mapping;
 
       const filtered = summary.map((item) => ({
         ...item,
-        // Обнуляем ненужные значения
+        // Обнуляем ненужные значения для корректного отображения графика
         "Сдача на склад сбыта - всего":
           selectedFactoryUnits.value === "всего"
             ? item["Сдача на склад сбыта - всего"]
             : 0,
-        [factoryKey]: item[factoryKey],
-        [`Плановая сдача на склад - ${selectedFactoryUnits.value}`]:
+        // Добавляем фактическое значение для выбранного завода
+        [unitsActualField]: item[unitsActualField],
+        // Добавляем плановую сдачу для выбранного завода
+        "Плановая сдача на склад":
           selectedFactoryUnits.value === "всего"
             ? item["Плановый % сдачи на склад"]
-            : item[planKey],
+            : item[unitsPlanField],
       }));
 
       setFilteredSummaryUnits(filtered);
     }
-  }, [selectedFactoryUnits, summary]);
+  }, [selectedFactoryUnits, summary, factoryMapping]);
 
-  const getDoughnutData = (type) => {
-    const dataItem = filteredSummaryPercent.find(
-      (item) => item["Наименование продукции"] === type
-    );
-    if (!dataItem) return null;
+  // Функция для получения данных для Doughnut диаграммы
+  const getDoughnutData = (item) => {
+    let actualValue, planValue;
 
-    const actualValue =
-      parseFloat(dataItem["Фактический % выполнения плана - всего"]) || 0;
+    if (selectedFactoryPercent.value === "всего") {
+      actualValue =
+        parseFloat(item["Фактический % выполнения плана - всего"]) || 0;
+      planValue = planPercent;
+    } else {
+      actualValue =
+        parseFloat(
+          item[factoryMapping[selectedFactoryPercent.value].actualField]
+        ) || 0;
+      planValue = parseFloat(item["Плановый % сдачи на склад"]) || 0;
+    }
 
-    // Используем общеплановый процент
-    const planValue = planPercent;
-
-    let color = "green";
+    // Определение цвета диаграммы
+    let color;
     if (actualValue < planValue) {
-      color = "red";
-    } else if (actualValue < 100) {
-      color = "yellow";
+      color = "rgba(252, 0, 0, 0.6)"; // Красный
+    } else if (actualValue >= planValue && actualValue < 100) {
+      color = "rgba(251, 255, 0, 0.6)"; // Жёлтый
+    } else if (actualValue >= 100) {
+      color = "rgba(0, 255, 42, 0.6)"; // Зелёный
     }
 
     return {
@@ -182,6 +212,7 @@ function UploadPage() {
     };
   };
 
+  // Функция для получения данных для Bar графика
   const getBarDataUnits = () => {
     return {
       labels: filteredSummaryUnits.map(
@@ -190,30 +221,48 @@ function UploadPage() {
       datasets: [
         {
           label: "Фактические",
-          data: filteredSummaryUnits.map(
-            (item) => item["Сдача на склад сбыта - всего"]
-          ),
+          data: filteredSummaryUnits.map((item) => {
+            if (selectedFactoryUnits.value === "всего") {
+              return item["Сдача на склад сбыта - всего"];
+            } else {
+              // Используем только соответствующее поле без запасных вариантов
+              return selectedFactoryUnits.value === "Маркс"
+                ? item["Сдача на склад сбыта - Маркс"] || 0
+                : item["Сдача на склад сбыта - ОП Москва"] || 0;
+            }
+          }),
           backgroundColor: filteredSummaryUnits.map((item) => {
-            const actual = item["Сдача на склад сбыта - всего"];
-            const plan =
-              selectedFactoryUnits.value === "всего"
-                ? item["Плановый % сдачи на склад"]
-                : item[
-                    `Плановая сдача на склад - ${selectedFactoryUnits.value}`
-                  ];
+            let actual, plan;
+            if (selectedFactoryUnits.value === "всего") {
+              actual = item["Сдача на склад сбыта - всего"];
+              plan = item["Плановый % сдачи на склад"];
+            } else {
+              actual =
+                selectedFactoryUnits.value === "Маркс"
+                  ? item["Сдача на склад сбыта - Маркс"]
+                  : item["Сдача на склад сбыта - ОП Москва"];
+              plan =
+                selectedFactoryUnits.value === "Маркс"
+                  ? item["Плановый % сдачи на склад - Маркс"]
+                  : item["Плановый % сдачи на склад - ОП Москва"];
+            }
             return actual >= plan
-              ? "rgba(75, 192, 192, 0.6)"
-              : "rgba(255, 99, 132, 0.6)";
+              ? "rgba(0, 255, 42, 0.6)" // Зелёный
+              : "rgba(252, 0, 0, 0.6)"; // Красный
           }),
         },
         {
           label: "Плановые",
-          data: filteredSummaryUnits.map((item) =>
-            selectedFactoryUnits.value === "всего"
-              ? item["Плановый % сдачи на склад"]
-              : item[`Плановая сдача на склад - ${selectedFactoryUnits.value}`]
-          ),
-          backgroundColor: "rgba(153, 102, 255, 0.6)",
+          data: filteredSummaryUnits.map((item) => {
+            if (selectedFactoryUnits.value === "всего") {
+              return item["Плановый % сдачи на склад"];
+            } else {
+              return selectedFactoryUnits.value === "Маркс"
+                ? item["Плановый % сдачи на склад - Маркс"] || 0
+                : item["Плановый % сдачи на склад - ОП Москва"] || 0;
+            }
+          }),
+          backgroundColor: "rgba(0, 26, 255, 0.6)", // Синий для плановых
         },
       ],
     };
@@ -271,7 +320,10 @@ function UploadPage() {
             "Итого (перепрошивка)",
             "ВСЕГО",
           ].map((type) => {
-            const doughnutData = getDoughnutData(type);
+            const item = filteredSummaryPercent.find(
+              (row) => row["Наименование продукции"] === type
+            );
+            const doughnutData = item ? getDoughnutData(item) : null;
             return (
               doughnutData && (
                 <div key={type} className="bg-white p-4 rounded shadow">
