@@ -2,31 +2,18 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 import { AuthProvider } from "./contexts/AuthContext";
-import PrivateRoute from "../src/components/PrivateRoute";
-
-import LoginPage from "./pages/LoginPage";
+// import PrivateRoute from "../src/components/PrivateRoute"; // Временно отключено
 import UploadPage from "./pages/UploadPage";
 
 function App() {
   return (
     <AuthProvider>
-      {/* Указание basename для подкаталога */}
       <Router basename="/Inotex-analytics">
         <Routes>
-          {/* Маршрут для страницы авторизации */}
-          <Route path="/" element={<LoginPage />} />
+          {/* Временно перенаправляем корневой маршрут на UploadPage */}
+          <Route path="/" element={<UploadPage />} />
 
-          {/* Защищенный маршрут для страницы загрузки */}
-          <Route
-            path="/upload"
-            element={
-              <PrivateRoute>
-                <UploadPage />
-              </PrivateRoute>
-            }
-          />
-
-          {/* Дополнительные маршруты при необходимости */}
+          {/* Дополнительные маршруты */}
           <Route path="*" element={<div>Страница не найдена</div>} />
         </Routes>
       </Router>
