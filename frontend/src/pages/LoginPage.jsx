@@ -4,10 +4,10 @@ import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../contexts/AuthContext";
 
 function LoginPage() {
-  const [username, setUsername] = useState(""); 
-  const [password, setPassword] = useState(""); 
-  const [isLoading, setIsLoading] = useState(false); 
-  const [error, setError] = useState(null); 
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const navigate = useNavigate();
   const { login } = useContext(AuthContext);
@@ -25,13 +25,16 @@ function LoginPage() {
     }
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, password }),
-      });
+      const response = await fetch(
+        "https://inotex-analytics.onrender.com/api/login",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ username, password }),
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();
