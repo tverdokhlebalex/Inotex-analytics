@@ -9,7 +9,10 @@ import logging
 import uvicorn
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 # Инициализация FastAPI
@@ -18,7 +21,7 @@ app = FastAPI()
 # Настройка CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://tverdokhlebalex.github.io"],  # В продакшене ограничить доверенными доменами
+    allow_origins=["https://tverdokhlebalex.github.io","https://tverdokhlebalex.github.io/Inotex-analytics", "http://127.0.0.1:3000", "http://127.0.0.1:8000"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,13 +34,6 @@ class LoginRequest(BaseModel):
 
 # Функция для обработки Excel-файла
 def process_excel_file(file_path: str) -> dict:
-    """
-    Обработка Excel-файла:
-    - Извлечение планового процента из ячейки Y4.
-    - Чтение данных с 11 строки.
-    - Выбор необходимых столбцов.
-    - Формирование итоговых строк.
-    """
     try:
         # Извлечение планового процента из Y4
         full_df = pd.read_excel(file_path, header=None)
@@ -70,6 +66,8 @@ def process_excel_file(file_path: str) -> dict:
 
         # Добавление строки "ВСЕГО", если отсутствует
         if "ВСЕГО" not in summary_rows["Наименование продукции"].values:
+            if processed_data.empty:
+                raise ValueError("Файл не содержит данных для обработки.")
             total_row = processed_data.iloc[-1].to_dict()
             total_row["Наименование продукции"] = "ВСЕГО"
             summary_rows = pd.concat([summary_rows, pd.DataFrame([total_row])], ignore_index=True)
@@ -86,9 +84,9 @@ def process_excel_file(file_path: str) -> dict:
 # Эндпоинт для загрузки файла
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
-    """
-    Загружает Excel-файл, обрабатывает его и возвращает результат.
-    """
+    if not file.filename.endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="Неправильный формат файла. Требуется .xlsx")
+
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_file:
             temp_file.write(await file.read())
@@ -111,9 +109,6 @@ async def upload_file(file: UploadFile = File(...)):
 # Эндпоинт для авторизации
 @app.post("/api/login")
 async def login(request: LoginRequest):
-    """
-    Проверка авторизации пользователя.
-    """
     if request.username == "admin" and request.password == "password":
         return {"access_token": "example_token_123", "token_type": "bearer"}
     raise HTTPException(status_code=401, detail="Неверное имя пользователя или пароль")
@@ -121,12 +116,8 @@ async def login(request: LoginRequest):
 # Проверка работоспособности сервера
 @app.get("/")
 def read_root():
-    """
-    Проверка статуса сервера.
-    """
     return JSONResponse(content={"message": "Сервер работает!"}, media_type="application/json; charset=utf-8")
 
-# Запуск сервера
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
