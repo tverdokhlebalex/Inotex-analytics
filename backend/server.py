@@ -6,6 +6,7 @@ import pandas as pd
 import os
 import tempfile
 import logging
+import uvicorn
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -140,3 +141,7 @@ async def login(request: LoginRequest):
 @app.get("/")
 def read_root():
     return {"message": "Сервер работает!"}
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
