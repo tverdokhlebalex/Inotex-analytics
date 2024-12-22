@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  build-deploy:
+  deploy-backend:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,17 +21,11 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          python -m pip install --upgrade pip
+          pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Build Docker image
+      - name: Deploy to Render
+        env:
+          PORT: 8000
         run: |
-          cd backend
-          docker build -t your-backend-image .
-
-      - name: Deploy to Heroku
-        run: |
-          docker tag your-backend-image registry.heroku.com/your-app-name/web
-          echo ${{ secrets.HEROKU_API_KEY }} | docker login --username=_ --password-stdin registry.heroku.com
-          docker push registry.heroku.com/your-app-name/web
-          heroku container:release web -a your-app-name
+          echo "Deploying to Render is managed externally. Ensure that your code is pushed to the repository."
