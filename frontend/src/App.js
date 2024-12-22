@@ -10,7 +10,8 @@ import UploadPage from "./pages/UploadPage";
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      {/* Указание basename для подкаталога */}
+      <Router basename="/Inotex-analytics">
         <Routes>
           {/* Маршрут для страницы авторизации */}
           <Route path="/" element={<LoginPage />} />
