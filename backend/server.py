@@ -18,7 +18,7 @@ app = FastAPI()
 # Настройка CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # В продакшене ограничить доверенными доменами
+    allow_origins=["https://tverdokhlebalex.github.io"],  # В продакшене ограничить доверенными доменами
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
