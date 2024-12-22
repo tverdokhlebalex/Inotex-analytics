@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/Inotex-analytics/static/css/main.3fa47dcb.css",
-    "main.js": "/Inotex-analytics/static/js/main.f4d05e2b.js",
+    "main.js": "/Inotex-analytics/static/js/main.1efbc47b.js",
     "index.html": "/Inotex-analytics/index.html",
     "main.3fa47dcb.css.map": "/Inotex-analytics/static/css/main.3fa47dcb.css.map",
-    "main.f4d05e2b.js.map": "/Inotex-analytics/static/js/main.f4d05e2b.js.map"
+    "main.1efbc47b.js.map": "/Inotex-analytics/static/js/main.1efbc47b.js.map"
   },
   "entrypoints": [
     "static/css/main.3fa47dcb.css",
-    "static/js/main.f4d05e2b.js"
+    "static/js/main.1efbc47b.js"
   ]
 }
