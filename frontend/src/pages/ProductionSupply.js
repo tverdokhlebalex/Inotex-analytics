@@ -77,9 +77,9 @@ function ProductionSupply() {
             categories.high.length,
           ],
           backgroundColor: [
-            "rgb(255, 99, 132)",
+            "rgb(252, 0, 0)",
             "rgb(255, 205, 86)",
-            "rgb(75, 192, 192)",
+            "rgb(0, 255, 42)",
           ],
           hoverOffset: 4,
         },
