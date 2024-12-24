@@ -29,19 +29,37 @@ function App() {
                   <Route path="summary" element={<UploadPage />} />
                   <Route
                     path="budget"
-                    element={<ProductionBudget />} // Временно неактивная страница
+                    element={
+                      <div>
+                        <ProductionBudget />
+                        <div className="text-center text-gray-500 mt-4">
+                          Страница временно недоступна
+                        </div>
+                      </div>
+                    } // Страница недоступна
                   />
-                  <Route
-                    path="supply"
-                    element={<ProductionSupply />} // Временно неактивная страница
-                  />
+                  <Route path="supply" element={<ProductionSupply />} />
                   <Route
                     path="repair"
-                    element={<ProductionRepair />} // Временно неактивная страница
+                    element={
+                      <div>
+                        <ProductionRepair />
+                        <div className="text-center text-gray-500 mt-4">
+                          Страница временно недоступна
+                        </div>
+                      </div>
+                    } // Страница недоступна
                   />
                   <Route
                     path="quality"
-                    element={<ProductionQuality />} // Временно неактивная страница
+                    element={
+                      <div>
+                        <ProductionQuality />
+                        <div className="text-center text-gray-500 mt-4">
+                          Страница временно недоступна
+                        </div>
+                      </div>
+                    } // Страница недоступна
                   />
                 </Routes>
               </div>
