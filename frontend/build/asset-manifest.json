@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/Inotex-analytics/static/css/main.81eb05f7.css",
+    "main.js": "/Inotex-analytics/static/js/main.71150d01.js",
+    "index.html": "/Inotex-analytics/index.html",
+    "main.81eb05f7.css.map": "/Inotex-analytics/static/css/main.81eb05f7.css.map",
+    "main.71150d01.js.map": "/Inotex-analytics/static/js/main.71150d01.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.81eb05f7.css",
+    "static/js/main.71150d01.js"
+  ]
+}
