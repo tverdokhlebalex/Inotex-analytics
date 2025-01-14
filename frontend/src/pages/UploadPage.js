@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import { Bar, Doughnut } from "react-chartjs-2";
 import "chart.js/auto";
+import logo from "../assets/logo-massar.png";
 
 function UploadPage() {
   // Состояния для файлов
@@ -230,8 +231,8 @@ function UploadPage() {
     <div className="min-h-screen w-full bg-gray-100">
       <header className="w-full bg-white p-4 shadow-md mb-4">
         <div className="max-w-7xl mx-auto flex items-center">
-          <div className="w-32 h-8 bg-gray-300 flex items-center justify-center text-sm">
-            Лого МОСАР
+          <div className="w-32 h-8 flex items-center justify-center">
+            <img src={logo} alt="МОССАР" className="h-full" />
           </div>
           <h1 className="text-xl font-bold ml-4">Производство</h1>
         </div>
