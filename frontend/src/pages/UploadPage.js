@@ -37,7 +37,7 @@ function UploadPage() {
       formData.append("budget", budgetFile);
       formData.append("remont", remontFile);
 
-      // Адрес вашего FastAPI-бэкенда на Render (роут "/upload")
+      // Адрес вашего FastAPI-бэкенда на Render ("/upload")
       const response = await axios.post(
         "https://inotex-analytics.onrender.com/upload",
         formData,
@@ -54,8 +54,6 @@ function UploadPage() {
   };
 
   // Функция для Doughnut-диаграммы
-  // Т.к. сервер уже возвращает строку вида "96.00%",
-  // придётся извлекать число. Пример: "96.00%" -> 96.00
   const createDoughnutData = (valueStr) => {
     if (!valueStr || typeof valueStr !== "string") {
       return {
@@ -109,7 +107,6 @@ function UploadPage() {
 
     const { sbyt, budget, remont } = data;
 
-    // Пример: sbyt.factPercentPlan уже "96.00%"
     return (
       <div className="w-full flex flex-col gap-4">
         {/* ВЕРХНЯЯ ПОЛОСА - 4 карточки + дата справа */}
@@ -144,18 +141,18 @@ function UploadPage() {
             <p className="text-2xl font-bold mt-2">{budget.remaining ?? "—"}</p>
           </div>
 
-          {/* Карточка 5: Дата (справа) */}
+          {/* Карточка 5: Дата */}
           <div className="bg-white rounded-md shadow-md p-3 flex flex-col items-center justify-center text-center">
             <p className="text-sm text-gray-600">Дата</p>
             <p className="text-xl font-bold mt-2">{sbyt.date ?? "—"}</p>
           </div>
         </div>
 
-        {/* НИЖНЯЯ ЧАСТЬ: 2 колонки: слева 2 круговых, справа 2 бар-графика */}
+        {/* НИЖНЯЯ ЧАСТЬ: слева 2 круговых, справа 2 бар-графика */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {/* Левая колонка: 2 Doughnut */}
           <div className="flex flex-col gap-4">
-            {/* Первый pie-chart: Однофазные */}
+            {/* % выполнения по однофазным */}
             <div className="bg-white rounded-md shadow-md p-4 flex flex-col items-center">
               <p className="text-lg font-bold mb-2">
                 % выполнения по однофазным приборам
@@ -165,7 +162,7 @@ function UploadPage() {
               </div>
             </div>
 
-            {/* Второй pie-chart: Трехфазные */}
+            {/* % выполнения по трехфазным */}
             <div className="bg-white rounded-md shadow-md p-4 flex flex-col items-center">
               <p className="text-lg font-bold mb-2">
                 % выполнения по трехфазным приборам
@@ -176,7 +173,7 @@ function UploadPage() {
             </div>
           </div>
 
-          {/* Правая колонка (2 Bar) */}
+          {/* Правая колонка: 2 Bar */}
           <div className="grid grid-rows-2 gap-4">
             {/* Исполнение бюджета */}
             <div className="bg-white rounded-md shadow-md p-4">
@@ -231,10 +228,8 @@ function UploadPage() {
 
   return (
     <div className="min-h-screen w-full bg-gray-100">
-      {/* Шапка с логотипом и названием */}
       <header className="w-full bg-white p-4 shadow-md mb-4">
         <div className="max-w-7xl mx-auto flex items-center">
-          {/* Логотип (заглушка) */}
           <div className="w-32 h-8 bg-gray-300 flex items-center justify-center text-sm">
             Лого МОСАР
           </div>
@@ -242,7 +237,7 @@ function UploadPage() {
         </div>
       </header>
 
-      {/* Блок загрузки файлов */}
+      {/* Загрузка файлов */}
       <div className="max-w-7xl mx-auto px-4 mb-4">
         <div className="bg-white p-4 rounded-md shadow-md flex flex-col md:flex-row gap-4 items-start md:items-center">
           <div className="flex flex-col">
@@ -274,16 +269,13 @@ function UploadPage() {
         </div>
       </div>
 
-      {/* Контейнер для вывода аналитики + ошибок */}
+      {/* Отображение ошибок и аналитики */}
       <div className="max-w-7xl mx-auto px-4 pb-8">
-        {/* Ошибка (если есть) */}
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
             {error}
           </div>
         )}
-
-        {/* Основной блок аналитики */}
         {renderAnalytics()}
       </div>
     </div>

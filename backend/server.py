@@ -27,7 +27,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 def _strip_time(value) -> str:
     """
     Убираем время из ячеек, если там datetime. 
@@ -35,116 +34,108 @@ def _strip_time(value) -> str:
     Иначе возвращаем как есть.
     """
     if isinstance(value, datetime):
-        return value.strftime("%d.%m.%Y")  # или любой другой нужный формат
+        return value.strftime("%d.%m.%Y")  # или другой нужный формат
     if isinstance(value, str) and " " in value:
         return value.split(" ")[0]
     return str(value)
-
 
 # ------------------ СБЫТ ------------------
 def process_sbyt(file_path: str) -> dict:
     """
     - «Фактический % выполнения плана»: столбец V (col=21) в последней строке.
-      Нужно умножать на 100, если это число < 1.
+      Если < 1.5, умножаем на 100 и добавляем «%».
     - «Сдача на склад»: столбец S (col=18) в последней строке.
-    - «Дата»: B1 => df.iloc[0, 1].
-    - «% выполнения по однофазным» и «% выполнения по трехфазным»:
-       Смотрим с 3-й строки (индекс 2) до последней,
-       Где столбец D (col=3) = «однофазный»/«трехфазный»
-       Берём столбец V (col=21) и **среднее** по группе (или сумму) — зависит от реальных данных.
-       После этого умножаем на 100, если < 1.
+    - «Дата» (B1 => df.iloc[0, 1]).
+    - «% выполнения по однофазным / трехфазным»:
+       Столбец D (col=3) = «однофазный»/«трехфазный», столбец V (col=21) = значение.
+       С 3-й строки (index=2) до конца, среднее по каждой группе.
     """
 
     df = pd.read_excel(file_path, header=None)
-    df.dropna(how='all', inplace=True)  # удаляем пустые строки
+    df.dropna(how='all', inplace=True)
 
-    # Дата из B1
+    # Дата (B1)
     try:
         date_value = df.iloc[0, 1]
     except:
         date_value = ""
 
-    # Фактический % выполнения плана (последняя строка, col=21)
+    # Фактический % выполнения плана
     try:
-        fact_val = df.iloc[-1, 21]
+        fact_val = df.iloc[-1, 21]  # столбец V
     except:
         fact_val = 0
-
-    # Если там коэффициент (0.96), умножим на 100 => 96
-    if isinstance(fact_val, (float, int)) and fact_val < 1.5:  # простая эвристика
+    if isinstance(fact_val, (float, int)) and fact_val < 1.5:
         fact_val = fact_val * 100
-    fact_percent_plan = f"{fact_val:.2f}%"  # Добавляем знак %
+    fact_percent_plan = f"{fact_val:.2f}%"
 
-    # Сдача на склад (col=18)
+    # Сдача на склад (S=18)
     try:
         sklad = df.iloc[-1, 18]
     except:
         sklad = 0
 
-    # === Посчитаем % однофазных / трехфазных ===
-    # c 3-й строки => индекс = 2
-    # «Вид продукции» = col=3 => "однофазный"/"трехфазный"
-    # «Выполнение (доля)» = col=21 => нужно усреднить по каждой группе.
-    df_sbyt = df.iloc[2:, :]  # начиная с 3-й строки
+    # Однофазные / Трехфазные
+    df_sbyt = df.iloc[2:, :]  # с 3-й строки
     one_phase_vals = []
     three_phase_vals = []
 
-    for idx, row in df_sbyt.iterrows():
+    for _, row in df_sbyt.iterrows():
         product_type = row[3]
         val = row[21]
         if pd.isna(val):
             continue
-        # Если val < 1.5, умножаем на 100
+
+        # Если это коэффициент < 1.5, умножаем на 100
         if isinstance(val, (float, int)) and val < 1.5:
             val = val * 100
 
         if isinstance(product_type, str):
-            product_type_lower = product_type.strip().lower()
-            if "однофаз" in product_type_lower:
+            pt_lower = product_type.lower()
+            if "однофаз" in pt_lower:
                 one_phase_vals.append(val)
-            elif "трехфаз" in product_type_lower:
+            elif "трехфаз" in pt_lower:
                 three_phase_vals.append(val)
 
-    # Среднее
     if one_phase_vals:
-        one_phase_percent = sum(one_phase_vals) / len(one_phase_vals)
+        op_avg = sum(one_phase_vals) / len(one_phase_vals)
     else:
-        one_phase_percent = 0
-    if three_phase_vals:
-        three_phase_percent = sum(three_phase_vals) / len(three_phase_vals)
-    else:
-        three_phase_percent = 0
+        op_avg = 0
 
-    # Округлим до 2 знаков + добавим %
-    one_phase_percent_str = f"{one_phase_percent:.2f}%"
-    three_phase_percent_str = f"{three_phase_percent:.2f}%"
+    if three_phase_vals:
+        tp_avg = sum(three_phase_vals) / len(three_phase_vals)
+    else:
+        tp_avg = 0
+
+    one_phase_str = f"{op_avg:.2f}%"
+    three_phase_str = f"{tp_avg:.2f}%"
 
     return {
         "date": _strip_time(date_value),
         "factPercentPlan": fact_percent_plan,
         "sklad": str(sklad),
-        "onePhasePercent": one_phase_percent_str,
-        "threePhasePercent": three_phase_percent_str,
+        "onePhasePercent": one_phase_str,
+        "threePhasePercent": three_phase_str,
     }
-
 
 # ------------------ БЮДЖЕТ ------------------
 def process_budget(file_path: str) -> dict:
     """
-    - «Процент исполнения бюджета»: столбец F (col=5), 
-      предпоследняя заполненная строка => умножаем на 100, если <1, + "%" 
-    - «Остаток средств планового бюджета»: 
-      по требованию: берем E4 (df.iloc[3, 4]) как начальный остаток,
-      вычитаем сумму столбца F (col=5) НИЖЕ этой строки (начиная с 4-й или 5-й).
-    - График «Исполнение бюджета»:
-      Даты => col=1 (B), с 4-й строки (индекс=3)
+    - «Процент исполнения бюджета»: столбец F (col=5) в предпоследней заполненной строке 
+      (умножаем на 100, если <1).
+    - «Остаток средств планового бюджета»:
+      Берём последнюю **заполненную** ячейку столбца E (col=4).
+      (Без фиксированного E4, т.к. кол-во строк может меняться).
+    - «Исполнение бюджета» (график):
+      С 4-й строки (index=3) и ниже,
+      Но берём только те строки, где столбец B (col=1) НЕ `NaN` (значит дата заполнена).
       План => col=2 (C)
       Факт => col=3 (D)
-      При выводе дат убираем время.
     """
 
     df = pd.read_excel(file_path, header=None)
     df.dropna(how='all', inplace=True)
+
     if df.empty:
         return {
             "percent": "0%",
@@ -154,90 +145,88 @@ def process_budget(file_path: str) -> dict:
             "fact": []
         }
 
-    # Попробуем найти последний индекс и предпоследний
-    last_idx = df.index[-1]          # последний
-    second_last_idx = last_idx - 1   # предпоследний
+    # Находим индекс последней и предпоследней заполненной строки
+    # способ 1: просто смотрим на df.index
+    # способ 2: можно искать по столбцу F
+    # Для упрощения используем df.index:
+    last_idx = df.index[-1]
+    second_last_idx = last_idx - 1 if last_idx >= 1 else 0
 
-    # Читаем значение в F (col=5) предпоследней строки
+    # Процент исполнения (столбец F=5) в предпоследней строке
     try:
-        raw_percent = df.iloc[second_last_idx, 5]
+        raw_percent = df.iloc[second_last_idx, 5]  # col=5
     except:
         raw_percent = 0
-
     if isinstance(raw_percent, (float, int)) and raw_percent < 1.5:
         raw_percent = raw_percent * 100
-    percent_val = f"{raw_percent:.2f}%"
+    percent_str = f"{raw_percent:.2f}%"
 
-    # Остаток планового бюджета
-    # Требование: взять E4 (df.iloc[3,4]) как нач. остаток
-    # Вычесть сумму столбца F (col=5), начиная с 4-й или 5-й строки (уточните)
-    # Допустим, начиная с 4-й строки => индекс=3
-    # Но строка 3 — это E4, тогда «ниже» — это индекс=4
-    try:
-        start_budget = df.iloc[3, 4]  # E4
-        if pd.isna(start_budget):
-            start_budget = 0
-    except:
-        start_budget = 0
+    # Остаток средств планового бюджета => последняя заполненная ячейка столбца E=4
+    # dropna => берём последнюю
+    colE = df[4].dropna()
+    if not colE.empty:
+        leftover_val = colE.iloc[-1]
+    else:
+        leftover_val = 0
 
-    try:
-        spent_series = df.iloc[4:, 5]  # всё, что ниже стр.4, столбец F
-        spent_sum = spent_series.fillna(0).sum()
-    except:
-        spent_sum = 0
+    # График исполнения
+    # 1) Берём с 4-й строки => index=3
+    sub_df = df.iloc[3:, :].copy()
+    # 2) Оставляем только строки, где в столбце B (col=1) есть дата
+    sub_df = sub_df[sub_df[1].notna()]
 
-    leftover_val = start_budget - spent_sum
-
-    # Подготовим данные для графика
-    sub_df = df.iloc[3:, :]  # с 4-й строки
+    # 3) Собираем массивы
     dates = []
     plan = []
     fact = []
-    for idx in sub_df.index:
-        rowB = sub_df.loc[idx, 1]  # col=1 (дата)
-        rowC = sub_df.loc[idx, 2]  # план
-        rowD = sub_df.loc[idx, 3]  # факт
+    for _, row in sub_df.iterrows():
+        # Дата => col=1
+        dt_val = _strip_time(row[1])
+        plan_val = row[2] if pd.notna(row[2]) else 0
+        fact_val = row[3] if pd.notna(row[3]) else 0
 
-        dates.append(_strip_time(rowB))
-        plan.append(rowC if pd.notna(rowC) else 0)
-        fact.append(rowD if pd.notna(rowD) else 0)
+        dates.append(dt_val)
+        plan.append(plan_val)
+        fact.append(fact_val)
 
     return {
-        "percent": percent_val,
+        "percent": percent_str,
         "remaining": str(leftover_val),
         "dates": dates,
         "plan": plan,
         "fact": fact
     }
 
-
 # ------------------ РЕМОНТ ------------------
 def process_remont(file_path: str) -> dict:
     """
-    - Даты => col=0 (A), с 2-й строки (index=1)
-    - Попало в ремонт => col=4 (E)
-    - Отремонтировано => col=5 (F)
-    Убираем время в датах.
+    - Даты => col=0, с 2-й строки (index=1)
+    - Попало в ремонт => col=4
+    - Отремонтировано => col=5
+    Убираем время.
     """
-
     df = pd.read_excel(file_path, header=None)
     df.dropna(how='all', inplace=True)
 
     if len(df) <= 1:
-        return {"dates": [], "inRepair": [], "repaired": []}
+        return {
+            "dates": [],
+            "inRepair": [],
+            "repaired": []
+        }
 
     sub_df = df.iloc[1:, :]  # со 2-й строки
     dates = []
     in_repair = []
     repaired = []
-    for idx in sub_df.index:
-        rowA = sub_df.loc[idx, 0]
-        rowE = sub_df.loc[idx, 4]
-        rowF = sub_df.loc[idx, 5]
+    for _, row in sub_df.iterrows():
+        dt = _strip_time(row[0])
+        e_val = row[4] if pd.notna(row[4]) else 0
+        f_val = row[5] if pd.notna(row[5]) else 0
 
-        dates.append(_strip_time(rowA))
-        in_repair.append(rowE if pd.notna(rowE) else 0)
-        repaired.append(rowF if pd.notna(rowF) else 0)
+        dates.append(dt)
+        in_repair.append(e_val)
+        repaired.append(f_val)
 
     return {
         "dates": dates,
@@ -245,16 +234,12 @@ def process_remont(file_path: str) -> dict:
         "repaired": repaired
     }
 
-
 @app.post("/upload")
 async def upload_files(
     sbyt: UploadFile = File(...),
     budget: UploadFile = File(...),
     remont: UploadFile = File(...)
 ):
-    """
-    Принимаем все три файла, обрабатываем, отдаём JSON.
-    """
     try:
         # 1) Сбыт
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_s:
@@ -292,7 +277,6 @@ async def upload_files(
 @app.get("/")
 def root():
     return JSONResponse({"message": "Сервер работает!"}, status_code=200)
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
