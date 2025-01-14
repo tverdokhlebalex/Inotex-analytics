@@ -34,7 +34,7 @@ def _strip_time(value) -> str:
     Иначе возвращаем как есть.
     """
     if isinstance(value, datetime):
-        return value.strftime("%d.%m.%Y")  # или другой нужный формат
+        return value.strftime("%d.%m.%Y")  
     if isinstance(value, str) and " " in value:
         return value.split(" ")[0]
     return str(value)
@@ -81,8 +81,8 @@ def process_sbyt(file_path: str) -> dict:
     three_phase_vals = []
 
     for _, row in df_sbyt.iterrows():
-        product_type = row[3]
-        val = row[21]
+        product_type = row[3]   # col=3
+        val = row[21]          # col=21
         if pd.isna(val):
             continue
 
@@ -125,7 +125,7 @@ def process_budget(file_path: str) -> dict:
       (умножаем на 100, если <1).
     - «Остаток средств планового бюджета»:
       Берём последнюю **заполненную** ячейку столбца E (col=4).
-      (Без фиксированного E4, т.к. кол-во строк может меняться).
+      Если она получается типа "0.258", умножим на 1e8 => "25800000".
     - «Исполнение бюджета» (график):
       С 4-й строки (index=3) и ниже,
       Но берём только те строки, где столбец B (col=1) НЕ `NaN` (значит дата заполнена).
@@ -146,9 +146,6 @@ def process_budget(file_path: str) -> dict:
         }
 
     # Находим индекс последней и предпоследней заполненной строки
-    # способ 1: просто смотрим на df.index
-    # способ 2: можно искать по столбцу F
-    # Для упрощения используем df.index:
     last_idx = df.index[-1]
     second_last_idx = last_idx - 1 if last_idx >= 1 else 0
 
@@ -162,25 +159,25 @@ def process_budget(file_path: str) -> dict:
     percent_str = f"{raw_percent:.2f}%"
 
     # Остаток средств планового бюджета => последняя заполненная ячейка столбца E=4
-    # dropna => берём последнюю
-    colE = df[4].dropna()
+    colE = df[4].dropna()  # все непустые из столбца E
     if not colE.empty:
-        leftover_val = colE.iloc[-1]
+        leftover_val = colE.iloc[-1]  # берем последнее непустое
+        # Если leftover_val похоже на коэффициент (например, 0.258),
+        # умножаем на 1e8 и приводим к целому
+        if isinstance(leftover_val, float) and leftover_val < 1.0:
+            leftover_val = leftover_val * 100000000
+        leftover_val = int(leftover_val)  # округлим до целого
     else:
         leftover_val = 0
 
     # График исполнения
-    # 1) Берём с 4-й строки => index=3
     sub_df = df.iloc[3:, :].copy()
-    # 2) Оставляем только строки, где в столбце B (col=1) есть дата
     sub_df = sub_df[sub_df[1].notna()]
 
-    # 3) Собираем массивы
     dates = []
     plan = []
     fact = []
     for _, row in sub_df.iterrows():
-        # Дата => col=1
         dt_val = _strip_time(row[1])
         plan_val = row[2] if pd.notna(row[2]) else 0
         fact_val = row[3] if pd.notna(row[3]) else 0
@@ -215,7 +212,7 @@ def process_remont(file_path: str) -> dict:
             "repaired": []
         }
 
-    sub_df = df.iloc[1:, :]  # со 2-й строки
+    sub_df = df.iloc[1:, :]
     dates = []
     in_repair = []
     repaired = []
