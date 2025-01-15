@@ -1,14 +1,14 @@
 {
   "files": {
     "main.css": "/Inotex-analytics/static/css/main.cc2625b8.css",
-    "main.js": "/Inotex-analytics/static/js/main.7d2e1b11.js",
+    "main.js": "/Inotex-analytics/static/js/main.cc81150a.js",
     "static/media/logo-massar.png": "/Inotex-analytics/static/media/logo-massar.c39d6449284cb90172cf.png",
     "index.html": "/Inotex-analytics/index.html",
     "main.cc2625b8.css.map": "/Inotex-analytics/static/css/main.cc2625b8.css.map",
-    "main.7d2e1b11.js.map": "/Inotex-analytics/static/js/main.7d2e1b11.js.map"
+    "main.cc81150a.js.map": "/Inotex-analytics/static/js/main.cc81150a.js.map"
   },
   "entrypoints": [
     "static/css/main.cc2625b8.css",
-    "static/js/main.7d2e1b11.js"
+    "static/js/main.cc81150a.js"
   ]
 }
