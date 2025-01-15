@@ -4,6 +4,18 @@ import { Bar, Doughnut } from "react-chartjs-2";
 import "chart.js/auto";
 import logo from "../assets/logo-massar.png";
 
+/**
+ * Функция для красивого форматирования чисел, разделяя разряды (например, 25800000 -> "25 800 000").
+ */
+function formatNumber(value) {
+  if (!value) return value;
+  // Удалим возможные пробелы, приведём к числу
+  const num = Number(value.toString().replace(/\s+/g, ""));
+  if (Number.isNaN(num)) return value;
+  // Разделим разряды пробелами
+  return num.toLocaleString("ru-RU").replace(/,/g, " ");
+}
+
 function UploadPage() {
   // Состояния для файлов
   const [sbytFile, setSbytFile] = useState(null);
@@ -108,44 +120,72 @@ function UploadPage() {
 
     const { sbyt, budget, remont } = data;
 
+    // Пример форматирования поля "Сдача на склад" и "Остаток..." через formatNumber(...)
+    const skladValue = formatNumber(sbyt.sklad);
+    const leftoverValue = formatNumber(budget.remaining);
+
     return (
       <div className="w-full flex flex-col gap-4">
-        {/* ВЕРХНЯЯ ПОЛОСА - 4 карточки + дата справа */}
-        <div className="grid grid-cols-5 gap-2">
+        {/* 
+          ВЕРХНЯЯ ПОЛОСА - карточки: 5 штук.
+          ДЛЯ АДАПТИВНОСТИ и уменьшения шрифта на маленьких экранах:
+          - используем grid с автопереносом на мобильных
+          - на sm-экранах уменьшим шрифт (Tailwind breakpoint "sm:")
+        */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
           {/* Карточка 1: % выполнения плана */}
-          <div className="bg-white rounded-md shadow-md p-3 flex flex-col items-center justify-center text-center">
-            <p className="text-sm text-gray-600">
-              Фактический % выполнения плана
-            </p>
-            <p className="text-2xl font-bold mt-2">
+          <div
+            className="bg-white rounded-md shadow-md p-3 flex flex-col items-center justify-center text-center 
+                          text-xs sm:text-sm md:text-base"
+          >
+            <p className="text-gray-600">Фактический % выполнения плана</p>
+            <p className="font-bold mt-1 text-lg sm:text-xl md:text-2xl">
               {sbyt.factPercentPlan ?? "—"}
             </p>
           </div>
 
           {/* Карточка 2: Сдача на склад */}
-          <div className="bg-white rounded-md shadow-md p-3 flex flex-col items-center justify-center text-center">
-            <p className="text-sm text-gray-600">Сдача на склад</p>
-            <p className="text-2xl font-bold mt-2">{sbyt.sklad ?? "—"}</p>
+          <div
+            className="bg-white rounded-md shadow-md p-3 flex flex-col items-center justify-center text-center
+                          text-xs sm:text-sm md:text-base"
+          >
+            <p className="text-gray-600">Сдача на склад</p>
+            <p className="font-bold mt-1 text-lg sm:text-xl md:text-2xl">
+              {skladValue ?? "—"}
+            </p>
           </div>
 
           {/* Карточка 3: Процент исполнения бюджета */}
-          <div className="bg-white rounded-md shadow-md p-3 flex flex-col items-center justify-center text-center">
-            <p className="text-sm text-gray-600">Процент исполнения бюджета</p>
-            <p className="text-2xl font-bold mt-2">{budget.percent ?? "—"}</p>
+          <div
+            className="bg-white rounded-md shadow-md p-3 flex flex-col items-center justify-center text-center
+                          text-xs sm:text-sm md:text-base"
+          >
+            <p className="text-gray-600">Процент исполнения бюджета</p>
+            <p className="font-bold mt-1 text-lg sm:text-xl md:text-2xl">
+              {budget.percent ?? "—"}
+            </p>
           </div>
 
           {/* Карточка 4: Остаток средств планового бюджета */}
-          <div className="bg-white rounded-md shadow-md p-3 flex flex-col items-center justify-center text-center">
-            <p className="text-sm text-gray-600">
-              Остаток средств планового бюджета
+          <div
+            className="bg-white rounded-md shadow-md p-3 flex flex-col items-center justify-center text-center
+                          text-xs sm:text-sm md:text-base"
+          >
+            <p className="text-gray-600">Остаток средств планового бюджета</p>
+            <p className="font-bold mt-1 text-lg sm:text-xl md:text-2xl">
+              {leftoverValue ?? "—"}
             </p>
-            <p className="text-2xl font-bold mt-2">{budget.remaining ?? "—"}</p>
           </div>
 
           {/* Карточка 5: Дата */}
-          <div className="bg-white rounded-md shadow-md p-3 flex flex-col items-center justify-center text-center">
-            <p className="text-sm text-gray-600">Дата</p>
-            <p className="text-xl font-bold mt-2">{sbyt.date ?? "—"}</p>
+          <div
+            className="bg-white rounded-md shadow-md p-3 flex flex-col items-center justify-center text-center
+                          text-xs sm:text-sm md:text-base"
+          >
+            <p className="text-gray-600">Дата</p>
+            <p className="font-bold mt-1 text-lg sm:text-xl md:text-2xl">
+              {sbyt.date ?? "—"}
+            </p>
           </div>
         </div>
 
@@ -229,6 +269,7 @@ function UploadPage() {
 
   return (
     <div className="min-h-screen w-full bg-gray-100">
+      {/* Шапка */}
       <header className="w-full bg-white p-4 shadow-md mb-4">
         <div className="max-w-7xl mx-auto flex items-center">
           <div className="w-32 h-8 flex items-center justify-center">
